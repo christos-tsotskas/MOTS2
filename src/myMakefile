@@ -1,0 +1,13 @@
+#!/bin/bash
+
+rm -rf memories
+rm -rf monitor_data
+
+mkdir memories
+mkdir monitor_data
+
+g++ -c mots.cpp
+g++ -c main.cpp
+g++ -o ts1 mots.o main.o
+rm *.o
+echo "compile done"

@@ -1,0 +1,5332 @@
+//============================================================================
+// Name        : mots_3.cpp
+// Author      : Christos Tsotskas
+// Version     :
+// Copyright   : L-GPL
+// Description : MOTS in C++, Ansi-style
+//============================================================================
+/* This file is part of MOTS_2.
+
+MOTS_2 is free software: you can redistribute it and/or modify
+it under the terms of the  GNU Lesser General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MOTS_2 is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public License
+along with MOTS_2.  If not, see <http://www.gnu.org/licenses/>.
+
+Copyright 2011 Christos Tsotskas
+ */
+
+#include "mots.h"
+
+#include <iostream>
+#include <fstream>
+#include <cmath> //abs
+#include <sys/stat.h> //file_exists
+#include <ctime>
+#include <deque>
+#include <numeric>
+#include <cassert>
+
+#include <cstring>
+
+
+using namespace std;
+
+/////////////////TABU SEARCH OPTIONS
+
+
+
+
+
+
+void initialise_vector(Point2 &P, double value){
+	for( unsigned int i=0; i<P.size() ; ++i)
+		P[i]=value;
+
+}
+void initialise_objective(ObjFunction2 &P, double value){
+	for( unsigned int i=0; i<P.size() ; ++i)
+		P[i]=value;
+
+}
+
+
+
+
+// overload operators
+#ifndef OPERATORS
+#define	OPERATORS
+
+void correct_accuracy(Point2 &P){
+	/*for ( Point::iterator it=P.begin(); it!=P.end(); ++it)
+if( fabs(*it)<epsilon )
+	 *it=0;*/
+
+	for ( unsigned int i=0; i < P.size(); ++i)
+		if(  abs(P[i])<epsilon )
+			P[i]=0.0;
+}
+
+#define round(r) ( (r) > 0.0) ? floor( (r) + 0.5) : ceil( (r) - 0.5);
+
+
+
+
+Point2 operator- (const Point2 &v1, const Point2 &v2){
+	Point2 nv(v1.size(),0.0);
+	initialise_vector(nv, 0);
+	//double result=0.0;
+
+	if (v1.size()!=v2.size()){
+		cout << "error, incompatible size! (operator -)" << endl;
+		std::exit(-30);
+	}else{
+
+		//calculate the absolute error
+		//		for (unsigned int i = 0; i < v1.size(); ++i){
+		//			result= (double) v1[i] - v2[i];
+		//			if(  abs(result)<  EPSILON )
+		//				result=0.0;
+		//
+		//			nv[i] = result;
+		//
+		//		}
+
+		//2os tropos
+		for (unsigned int i = 0; i < v1.size(); ++i){
+			nv[i] = floor(MAGNIFIER*v1[i] - MAGNIFIER*v2[i])/MAGNIFIER ;
+			if( abs(nv[i])<EPSILON )
+				nv[i]=0.0;
+		}
+
+		//3os tropos
+		//		for (unsigned int i = 0; i < v1.size(); ++i){
+		//			nv[i]= (double) ( v1[i] - v2[i] );
+		//			(nv[i] > 0.0) ? floor(nv[i] + 0.5) : ceil(nv[i] - 0.5);
+		//
+		//			if( abs(nv[i])<EPSILON )
+		//				nv[i]=0.0;
+		//		}
+
+	}
+
+	return nv;
+}
+
+Point2 operator+ (const Point2 &v1, const Point2 &v2){
+	Point2 nv(v1.size(),0.0);
+	initialise_vector(nv, 0);
+	//double result=0.0;
+
+	if (v1.size()!=v2.size()){
+		cout << "error, incompatible size! (operator +)" << endl;
+		exit(-30);
+	}else{
+
+		//calculate the absolute error
+		//		for (unsigned int i = 0; i < v1.size(); ++i){
+		//			result= (double) v1[i] + v2[i];
+		//			if( abs(result)<  EPSILON )
+		//				result=0.0;
+		//
+		//			nv[i] = result;
+		//
+		//		}
+
+		//2os tropos
+		for (unsigned int i = 0; i < v1.size(); ++i){
+			nv[i] = floor(MAGNIFIER*v1[i] + MAGNIFIER*v2[i])/MAGNIFIER ;
+			if( abs(nv[i])<EPSILON )
+				nv[i]=0.0;
+		}
+
+		//3os tropos
+		//		for (unsigned int i = 0; i < v1.size(); ++i){
+		//			nv[i]= (double) ( v1[i] + v2[i] );
+		//			(nv[i] > 0.0) ? floor(nv[i] + 0.5) : ceil(nv[i] - 0.5);
+		//
+		//			if( abs(nv[i])<EPSILON )
+		//				nv[i]=0.0;
+		//		}
+
+	}
+
+	return nv;
+}
+
+Point2 operator/ (const Point2 &v1, const Point2 &v2){ //only needed for local regions in LTM
+	Point2 nv(v1.size(),0.0);
+	initialise_vector(nv, 0);
+	double result=0.0;
+
+	if (v1.size()!=v2.size()){
+		cout << "error, incompatible size! (operator /)" << endl;
+		exit(-30);
+	}else{
+
+		//calculate the absolute error
+		for (unsigned int i = 0; i < v1.size(); ++i){
+			result= (double) v1[i] / v2[i];
+			if( abs(result)<  EPSILON )
+				result=0.0;
+
+			nv[i] = result;
+
+		}
+
+
+		//for (unsigned int i = 0; i < v1.size(); ++i)
+		//	nv[i] = floor(mangifier*v1[i] + mangifier*v2[i])/mangifier;
+
+	}
+
+	return nv;
+}
+
+Point2 operator/ (const Point2 &v1, const int N){
+	Point2 nv(v1.size(),0.0);
+	initialise_vector(nv, 0);
+	double result=0.0;
+
+	if (v1.size()!=0){
+		cout << "error, zero size vector! (operator /)" << endl;
+		exit(-35);
+	}else{
+
+		//calculate the absolute error
+		for (unsigned int i = 0; i < v1.size(); ++i){
+			result= (double) v1[i] / N;
+			if( abs(result)<  EPSILON )
+				result=0.0;
+
+			nv[i] = result;
+
+		}
+
+
+		//for (unsigned int i = 0; i < v1.size(); ++i)
+		//	nv[i] = floor(mangifier*v1[i] + mangifier*v2[i])/mangifier;
+
+	}
+
+	return nv;
+}
+
+template <typename T> std::ostream& operator<<(std::ostream &os, const std::vector<T>& v)	{
+	for (std::size_t i = 0; i < v.size(); i++)
+	{
+		os << v[i] << " ";
+	}
+	return os;
+}
+
+/*template <typename T, size_t S> std::ostream& operator<<(std::ostream &os, const  boost::array<T, S>& A)	{
+for (std::size_t i = 0; i < S; i++)
+{
+os << A[i] << " ";
+}
+return os;
+}*/
+
+bool operator==(const Point2 &P1, const Point2 &P2) {
+	// check lengths of lists
+	if (P1.size() != P2.size()){
+		cout << " comparison ==, incompatible size!" << endl;
+		exit(-31);
+	}
+	for (unsigned int k=0; k<P1.size(); ++k)
+		if (  fabs(P1[k]-P2[k])>epsilon ) return false;
+	//if (  P1[k]!=P2[k] ) return false;
+
+	// check contents of lists
+	/*for (unsigned int k=0; k<P1.size(); ++k) {
+if (  fabs(P1[k]-P2[k])>epsilon ) return false;
+}*/
+	return true;
+}
+
+
+bool operator>(const Point2 &P1, const Point2 &P2) {
+	// check lengths of lists
+	if (P1.size() != P2.size()){
+		cout << " comparison > , incompatible size! (operator>)" << endl;
+		exit(-32);
+	}
+	// check contents of lists
+	/*for (unsigned int k=0; k<P1.size(); ++k) {
+if (  fabs(P1[k]-P2[k])>epsilon ) return false;
+}*/
+
+	for(unsigned int i=0; i<P1.size(); ++i)
+		if( fabs(P1[i]-P2[i])<epsilon  )
+			return false;
+
+	return true;
+}
+
+bool operator<(const Point2 &P1, const Point2 &P2) {
+	// check lengths of lists
+	if (P1.size() != P2.size()){
+		cout << " comparison < , incompatible size! (operator<)" << endl;
+		exit(-32);
+	}
+	// check contents of lists
+	/*for (unsigned int k=0; k<P1.size(); ++k) {
+if (  fabs(P1[k]-P2[k])>epsilon ) return false;
+}*/
+
+	for(unsigned int i=0; i<P1.size(); ++i)
+		if(P1[i]>P2[i])
+			return false;
+
+	return true;
+}
+
+template<typename T >
+void copy_contents(std::vector<T>  &P, std::vector<T> const &A){
+	for (std::size_t i = 0; i < P.size(); i++)
+		P[i] = A[i];
+}
+
+template<typename T >
+std::vector<T> vector_power(std::vector<T> &P, const double &n){
+	std::vector<T> output(P.size(),0.0);
+	for (unsigned int i=0 ; i< P.size() ; ++i)
+		output[i]=pow( P[i],n);
+
+	return output;
+}
+template<typename T>
+std::vector<T> vector_power(const std::vector<T> &P, const double &n){
+	std::vector<T> output(P.size(),0.0);
+	for (unsigned int i=0 ; i< P.size() ; ++i)
+		output[i]=pow( P[i],n);
+
+	return output;
+}
+
+template<typename T >
+double euclidean_dist(const std::vector<T> &current_point , const std::vector<T> &reference_point){
+	double output=0.0;
+
+	for (unsigned int i=0 ; i< current_point.size() ; ++i)
+		output+=pow( current_point[i] -reference_point[i] ,2);
+
+	return pow(output,0.5);
+}
+
+int FileExists(char const *strFilename) { //// ORIGINAL was BOOL!!!!!
+	struct stat stFileInfo;
+	////bool blnReturn;
+	int intStat;
+
+	// Attempt to get the file attributes
+	intStat = stat(strFilename,&stFileInfo);
+	if(intStat == 0) {
+		// We were able to get the file attributes
+		// so the file obviously exists.
+		////	blnReturn = true; //// ORIGINAL
+		return 1;
+	} else {
+		// We were not able to get the file attributes.
+		// This may mean that we don't have permission to
+		// access the folder which contains this file. If you
+		// need to do that level of checking, lookup the
+		// return values of stat which will give you
+		// more details on why stat failed.
+		////	blnReturn = false; //// ORIGINAL
+		return 0;
+	}
+
+	//// return(blnReturn); //// ORIGINAL
+}
+
+template<typename T>
+int compare_error ( std::vector<T> const &v1,  std::vector<T> const &v2){
+	/*
+	 * resolve whether two vectors are equal,
+	 * return 1 if they are numerically equal
+	 * 0, otherwise
+	 */
+
+
+	double const comp_epsilon=1e-4;
+	unsigned int equality_counter=0;
+
+	if (v1.size()!=v2.size()){
+		cout << "compare_error, impcompatible size! (compare_error)" << endl;
+
+		exit(-33);
+	}else{
+
+
+		for (unsigned int i = 0; i < v1.size(); ++i)
+			if( abs(v1[i] - v2[i])<comp_epsilon  )
+				++equality_counter;
+
+		if (equality_counter==v1.size())
+			return 1;
+
+
+
+		//for (unsigned int i = 0; i < v1.size(); ++i)
+		//	nv[i] = floor(mangifier*v1[i] - mangifier*v2[i])/mangifier;
+
+	}
+
+	return 0;
+}
+
+#endif
+
+
+extern "C" {
+int ffd_ (const double&, const int*, const double&, const double&, const int&, const int&);
+//      int ffd_ (const double&, const int*, const char*, const int&, const int&);
+int xfoil_ (const double&, const double&, const char*, const int&, const double&, const double&, const int&);
+//      int xfoil_ (const double&, const double&, const char*, const int&);
+}
+
+void ID(){
+	srand((unsigned)(time(0)+46582));
+}
+double RD(){
+	return rand()/ ( (double)RAND_MAX +1) ; //(double(RAND_MAX)+1);
+}
+
+template <typename T>
+T RandomNumber2(T min, T max){
+	T r = rand() /  ((T)RAND_MAX );
+	return (T)(min + r * (max - min));
+}
+
+template<typename T>
+void ObjectiveFunctionBasic<T>::read_bounds_from_file(char const *name, unsigned int const n_of_entries, Point2 &low_bound, Point2 &high_bound){
+	std::ifstream design_vector_bounds(name);
+	unsigned int check_counter=0; //counts how many elements have been read and the optimisation will be stopped, if the input is not corret!
+	if(design_vector_bounds.is_open()){
+		cout << endl << "external declaration of design vector ranges" << endl;
+		for(unsigned int i=0; i<n_of_entries ; ++i){
+			design_vector_bounds >> low_bound[i];
+			++check_counter;
+			design_vector_bounds >> high_bound[i];
+			++check_counter;
+			cout << "\tvariable " << i << " ranges between " << low_bound[i] << " and " << high_bound[i] << endl;
+		}
+		design_vector_bounds.close();
+		if ( check_counter!=2*low_bound.size()){
+			cout << "invalid  " << name << "! (not enough elements of lower and upper bound for each variable - totally read "<< check_counter <<" elements - check the contents of the file)" << endl;
+			exit(-1000);
+		}
+	}else{
+		cout << " couldn't read file" << name << endl;
+		exit(-150);
+	}
+}
+
+//
+//template<typename T>
+//ObjectiveFunctionBasic<T>::ObjectiveFunctionBasic(){
+//
+//#ifdef xfoil
+//	n_vara = 8;
+//	//x0_ffd = new T[n_vara+8];
+//	xfoil_flag=0;
+//	xfoilflag=0;
+//	cl=0;
+//	cd=0;
+//	Point vars(8, 0.0);
+//#endif
+//}
+//
+
+
+template<typename T>
+ObjectiveFunctionBasic<T>::ObjectiveFunctionBasic(unsigned int &m,unsigned int &n) :
+nVar(m),
+nObj(n),
+n_of_successful_calculations(0),
+violations(0),
+min_bound(nVar,0.0),
+max_bound(nVar,0.0),
+range(nVar,0.0),
+failedObjectiveFunctionVector(nObj,0.0)
+{
+
+	//read failed objective vector - START
+	cout << endl <<  "failed_objective_vector file ...";
+	if( FileExists("failed_objective_vector.txt") )
+		cout << " OK!"<< endl;
+	else{
+		cout << "NOT FOUND!!!" << endl;
+		exit(-1010);
+	}
+
+	ifstream FOV("failed_objective_vector.txt");
+	if(FOV.is_open()){
+		for (unsigned int i=0; i< nObj; ++i)
+			FOV>>failedObjectiveFunctionVector[i];
+
+		FOV.close();
+		cout << "\tfailed_objective_vector read " << failedObjectiveFunctionVector << endl;
+	}else{
+		cout <<"no failed_objective_vector.txt file was found" << endl;
+
+	}
+
+	//read failed objective vector - END
+
+	//read design vector ranges - START
+
+#if defined(ZDT1) || defined(ZDT2) || defined(ZDT3) || defined(ZDT4) || defined(ZDT6) || defined(DTLZ1) || defined(DTLZ2) || defined(DTLZ3) || defined(DTLZ4) || defined(DTLZ5) || defined(DTLZ6) || defined(DTLZ7)
+	cout << "one of the built-in options was selected, so the design_vector_ranges.txt is not read!!!" << endl;
+	cout << "\tone of the following is activated: ZDT1, ZDT2, ZDT3, ZDT4,  ZDT5, ZDT6, DTLZ1, DTLZ2, DTLZ3, DTLZ4, DTLZ5, DTLZ6, DTLZ7" << endl;
+#else
+	cout << endl <<  "design vector ranges file ...";
+	if( FileExists("design_vector_ranges.txt") ){
+		cout << " OK!"<< endl;
+		read_bounds_from_file("design_vector_ranges.txt",nVar, min_bound, max_bound);
+	}else{
+		cout << "NOT FOUND!!!" << endl;
+		exit(-1001);
+	}
+#endif
+
+	//read design vector ranges - END
+
+
+
+	//set max and min bounds and calculate ranges
+
+#ifdef ZDT1
+
+	initialise_vector(max_bound,1);
+	initialise_vector(min_bound,0);
+
+#endif
+
+#ifdef ZDT2
+	initialise_vector(max_bound,1);
+	initialise_vector(min_bound,0);
+#endif
+
+#ifdef ZDT3
+	initialise_vector(max_bound,1);
+	initialise_vector(min_bound,0);
+#endif
+
+#ifdef ZDT4
+	initialise_vector(max_bound,5);
+	initialise_vector(min_bound,-5);
+
+	max_bound[0]=1;
+	min_bound[0]=0;
+#endif
+
+#ifdef ZDT6
+	initialise_vector(max_bound,1);
+	initialise_vector(min_bound,0);
+#endif
+
+#ifdef DTLZ1
+	initialise_vector(max_bound,1);
+	initialise_vector(min_bound,0);
+#endif
+
+#ifdef DTLZ2
+	initialise_vector(max_bound,1);
+	initialise_vector(min_bound,0);
+#endif
+
+#ifdef DTLZ3
+	initialise_vector(max_bound,1);
+	initialise_vector(min_bound,0);
+#endif
+
+#ifdef DTLZ4
+	initialise_vector(max_bound,1);
+	initialise_vector(min_bound,0);
+#endif
+
+#ifdef DTLZ5
+	initialise_vector(max_bound,1);
+	initialise_vector(min_bound,0);
+#endif
+
+#ifdef DTLZ6
+	initialise_vector(max_bound,1);
+	initialise_vector(min_bound,0);
+#endif
+
+#ifdef DTLZ7
+	initialise_vector(max_bound,1);
+	initialise_vector(min_bound,0);
+#endif
+
+
+
+	//new ones for xfoil
+#ifdef xfoil
+//	initialise_vector(max_bound,0.3);
+//	initialise_vector(min_bound,-0.4);
+
+	n_vara = 8;
+
+	//x0_ffd = Point( n_vara + 8, 0.0);
+	xfoil_flag=0;
+	xfoilflag=0;
+	cl=0.;
+	cd=0.;
+	vars = Point(8, 0.0);
+#endif
+
+#ifdef external
+
+	//Dortmund External
+	//	variables_name="./variables.txt";
+	//	objectives_name="./objectives.txt";
+	//	evaluator="./main_pc64-opteron-linux-gcc4.x";
+	//	initialise_vector(max_bound,50);
+	//	initialise_vector(min_bound,-50);
+
+	//nurul External
+	variables_name="FuelComponent.inp";
+	objectives_name="Results.out";
+	evaluator="BioEvaluat.exe";
+	//	min_bound[0]=0.0;
+	//	min_bound[1]=0.0;
+	//	min_bound[2]=0.51;
+	//
+	//	max_bound[0]=100.0;
+	//	max_bound[1]=0.0;
+	//	max_bound[2]=0.7;
+
+	//todo: fix it to read the design_vector_ranges.txt
+
+
+	//			initialise_vector(max_bound,50);
+	//	initialise_vector(min_bound,-50);
+
+
+#endif
+
+#ifdef external2
+
+
+
+	//GATAC External
+	//variables_name="toBeEvaluated.txt";
+	//objectives_name="toBeEvaluated.txt.out";
+	strcpy(variables_name,"toBeEvaluated.txt");
+	strcpy(objectives_name,"toBeEvaluated.txt.out");
+
+
+#endif
+
+	range=max_bound-min_bound;
+}
+
+
+
+template<typename T>
+double ObjectiveFunctionBasic<T>::sum(const Point2 &Pnt){
+	double result=0;
+
+	result = std::accumulate(Pnt.begin(),Pnt.end()-1,result);
+	return result;
+}
+
+
+#ifdef user_defined
+template<typename T>
+int ObjectiveFunctionBasic<T>::set_user_defined_bounds(Point2 &low, Point2 &high){
+	//alternative definition
+	/*for(int i=0; i< low.size(); ++i)
+low[i]=0.0;
+
+for(int i=0; i< high.size(); ++i)
+high[i]=1.0;*/
+
+	initialise_vector(high,5);
+	initialise_vector(low,-5);
+
+	high[0]=1;
+	low[0]=0;
+
+	return 1;
+}
+
+
+//implement the constraints and the objectives of the model
+template<typename T>
+ObjFunction2  ObjectiveFunctionBasic<T>::eval_user_defined_function(Point2 &input){
+	ObjFunction2 output;
+
+
+	//example of ZDT4 implementation
+	if( input.size() != 10){
+		std::cout << " ZDT4 input has" << input.size() << "variables, instead of 10" << std::endl;
+		exit(-100);
+	}
+	int i = 0;
+	int n = input.size();
+	double f1 = 0;
+	double g = 0;
+	double h = 0;
+
+
+	assert(n == 10); //variable vector length
+	assert(output.size() == 2);
+
+	f1 = input[0];
+
+	for (i = 1; i < n; i++)
+	{
+		double x = input[i];
+		g += x * x - 10 * std::cos(4 * pi * x);
+	}
+	g = 1 + 10 * (n - 1) + g;
+	h = 1 - std::sqrt(f1 / g);
+
+	output[0]=f1;
+	output[1] = g * h;
+
+
+
+	return output;
+}
+
+#endif //user_defined
+
+
+template<typename T>
+ObjFunction2 ObjectiveFunctionBasic<T>::calculateObjFun(Point2 &input){
+
+	ObjFunction2 output(failedObjectiveFunctionVector);
+	//Point2::iterator it=input.begin();
+	//double g ,h, s;
+	//double temp_sum=0.0, tempS_sum=0.0;
+
+#ifdef DEBUG_EVALUATING
+	cout << " evaluating " << input << endl;
+#endif
+	//from now on, the implementation of objective function starts!
+
+
+	//cout << "evaluating solution!" << endl;
+
+#ifdef xfoil
+	double f1 , f2;
+
+	if(isValid(input) ) {
+
+
+		for(  int i=0; i < 16; ++i)
+			x0_ffd[i]=0;
+
+
+		ncp[0]=4;
+		ncp[1]=2;
+
+		for(  int i=4; i <input.size()+4; ++i)
+			x0_ffd[i] = input[i-4];
+
+
+
+		cout << "<!-- This is a comment: &#160;  &nbsp <XFOIL>calling FFD and xfoil" << endl;
+
+
+		pid_t mypid=getpid();
+		char extn[8];
+		gcvt(mypid,7,extn);
+		cout << "extn... = " << extn << endl;
+		//     sprintf(ff,ff1,extn);
+		string ff1 = string("ffd.") + string(extn);
+		const char* ff = ff1.c_str();
+
+
+		ffd_flag = ffd_(x0_ffd[0], ncp, ffd_dpx[0], ffd_dpy[0],np, ffdflag);
+
+		if(ffd_flag!=0)
+			cout << "FFD - OK" << endl;
+		else
+			cout << "FFD - FAILED!!!" << endl;
+
+		xfoil_flag = xfoil_(cl, cd, ff, xfoilflag, ffd_dpx[0], ffd_dpy[0], np);
+
+		++n_of_successful_calculations;
+
+		if (xfoilflag==0 && xfoil_flag==0 && cl==cl && cd==cd) {
+			cout << "XFOIL successful..." << endl;
+			f1  = -(cl/1.4644);
+			f2  = cd/0.03051;
+		} else {
+
+			cout << "XFOIL NOT successful..." << endl;
+			cout << "about to call InvalidDesignVector" << endl;
+			//throw cppot::InvalidGeometryException();
+			++violations;
+			return failedObjectiveFunctionVector;
+		}
+		cout << "cl = " << f1  << endl;
+		cout << "cd = " << f2  << endl;
+		cout << "interface xfoil flag = " << xfoilflag << endl;
+		cout << "interface xfoil flag2 = " << xfoil_flag << endl;
+		cout << "interface ffd flag = " << ffdflag << endl;
+
+
+	}else{
+		++violations;
+		return failedObjectiveFunctionVector;
+	}
+
+	output[0]=f1;
+	output[1]=f2;
+
+#endif
+
+
+
+
+
+#ifdef TEST_FUNCTIONS // gia ZDT functions
+	if(isValid(input) ) {
+		++n_of_successful_calculations;
+
+
+
+#ifdef ZDT1a
+		(void)system("./zdt1");
+#endif
+		//-------------
+#ifdef ZDT1
+		output=eval_ZDT1(input );
+#endif
+		//-------------
+#ifdef ZDT2
+		output=eval_ZDT2(input );
+#endif
+		//-------------
+#ifdef ZDT3
+		output=eval_ZDT3(input );
+#endif
+		//-------------
+#ifdef ZDT4
+		output=eval_ZDT4(input );
+#endif
+		//-------------
+#ifdef ZDT6
+		output=eval_ZDT6(input );
+#endif
+
+#ifdef DTLZ1
+		output=eval_DTLZ1(input, nObj);
+#endif
+
+#ifdef DTLZ2
+		output=eval_DTLZ2(input, nObj);
+#endif
+
+#ifdef DTLZ3
+		output=eval_DTLZ3(input, nObj);
+#endif
+
+#ifdef DTLZ4
+		output=eval_DTLZ4(input, nObj);
+#endif
+
+#ifdef DTLZ5
+		output=eval_DTLZ5(input, nObj);
+#endif
+
+#ifdef DTLZ6
+		output=eval_DTLZ6(input, nObj);
+#endif
+
+#ifdef DTLZ7
+		output=eval_DTLZ7(input, nObj);
+#endif
+
+#ifdef external
+		//Dortmund and Nurul
+		output=eval_external_evaluator(input );
+
+		//xfoil
+		//		output=eval_user_defined_function(input );
+#endif
+
+#ifdef external2
+		output=eval_external_evaluator2(input );
+#endif
+
+
+#ifdef user_defined
+		output=eval_user_defined_function(input );
+
+#endif
+
+	}else{
+		++violations;
+
+		return failedObjectiveFunctionVector;
+	}
+#endif /*TEST_FUNCTIONS*/
+
+
+	return output;
+
+}
+
+
+template<typename T>
+void ObjectiveFunctionBasic<T>::calculateObjFun_parallel(std::map<Point2,ObjFunction2> &C1){
+	Point2 input(nVar,0.0);
+
+	/*double f1 , f2 , g ,h, s;
+double temp_sum=0.0, tempS_sum=0.0;*/
+	std::map<Point2,ObjFunction2> valid_designs_for_evaluation;
+
+#ifdef DEBUG_EVALUATING
+	cout << " evaluating " << input << endl;
+#endif
+
+	//filter out the invalid designs and assign them the penalty value
+	for(Container2::iterator it=C1.begin(); it!=C1.end(); ++it){
+		input=it->first;
+		if(isValid(input) ) {
+			++n_of_successful_calculations;
+			valid_designs_for_evaluation.insert(entry(it->first, it->second));
+			//it->second=output;
+		}else{
+			++violations;
+			it->second=failedObjectiveFunctionVector;
+		}
+	}
+
+	//send all the valid designs to the evaluator, should any exist
+	if(valid_designs_for_evaluation.size()>0){
+#ifdef external2
+		eval_external_evaluator2_parallel(valid_designs_for_evaluation);
+#endif //external2
+#ifndef external2//ZDT
+		eval_internal_parallel(valid_designs_for_evaluation);
+#endif //ZDT
+
+		for(std::map<Point2,ObjFunction2>::iterator it=valid_designs_for_evaluation.begin(); it!=valid_designs_for_evaluation.end(); ++it)
+			C1[it->first]=it->second;
+	}
+}
+
+
+/*
+ *
+ObjFunction2 ObjectiveFunctionBasic<T>::eval_ZDT1(Point2 &input)
+ *
+ */
+template<typename T>
+int  ObjectiveFunctionBasic<T>::isValid ( Point2 &P){
+
+
+	for(unsigned int i=0; i<P.size(); ++i){
+		//cout << " checks margins!" << min_bound[i] << " " << P[i] << " " << max_bound[i] << endl;
+		if( (P[i]>max_bound[i]) || (P[i]<min_bound[i])){
+			//cout << "validity:FAILED" << endl;
+			return 0;
+		}
+	}
+
+	//cout << "validity:OK !" << endl;
+	return 1;
+	//write up any constraints
+}
+
+///////////////////////////////////////////////////////////////////////
+//////  Implementation of  ObjectiveFunctionBasic  END
+///////////////////////////////////////////////////////////////////////
+
+
+#ifndef OBJECTIVES_ACCURACY
+#define OBJECTIVES_ACCURACY
+typedef ObjectiveFunctionBasic<double> ObjectiveFunction;
+#endif
+
+/*
+template < typename Variable_Type, size_t Variable_Size, typename Objective_Type, size_t Objective_Size>
+class CCC : public map< boost::array<Variable_Type, Variable_Size>, boost::array<Objective_Type, Objective_Size> >{
+typedef boost::array<Variable_Type, Variable_Size> VarVect;
+typedef boost::array<Objective_Type, Objective_Size> ObjVect;
+
+ */
+
+
+/*
+ * Implementation of Container2 START
+ *
+ */
+
+//Container2::Container2(unsigned int n, unsigned int m): local_nVar(n), local_nObj(m){
+//	srand((unsigned)(time(0)));
+//}
+
+Container2::Container2(unsigned int n, unsigned int m, char const *given_name):
+		local_nVar(n),
+		local_nObj(m),
+		container_name(given_name){
+
+	if( strcmp(container_name, "MTM_cont")==0 or strcmp(container_name, "IM_cont")==0 or strcmp(container_name, "HIST_cont")==0)
+		cout << "container" << container_name << " has just been created, nVar=" << local_nVar << " and nObj=" << local_nObj << endl;
+
+	srand((unsigned)(time(0)));
+}
+
+Container2::~Container2(){
+
+	if( strcmp(container_name, "MTM_cont")==0 or strcmp(container_name, "IM_cont")==0 or strcmp(container_name, "HIST_cont")==0){
+		cout << container_name  << " terminated " << endl;
+		//exit(-1010101);
+	}
+}
+
+//Algorithm 2
+int Container2::dominates(const Point2 &V1,const ObjFunction2 &O1, const Point2 &V2,const ObjFunction2 &O2){ //container
+	//the input arguments are the entries "as-is" on the map structure
+	// MAKE SURE THAT BOTH ENTRIES ARE FULLY FILLED IN!!!!
+	//dexetai ws argument olo to entry apo to antistoixo map!
+
+	/*
+	 * A point x1 , with an objective function vector F1, is said to dominate point x2,
+	 * with an objective function vector F2, if no component of F1 is greater than its corresponding
+	 * component in F2, and at least one component is smaller.
+	 * <->
+	 * F1's components are smaller than F2's
+	 *
+	 */
+
+#ifdef DEBUG
+	if(V1.empty()){
+		cout << "variable 1 is empty!" << endl;
+		exit(-111);
+	}
+	if(O1.empty()){
+		cout << "objective 1 is empty!" << endl;
+		exit(-222);
+	}
+	if(V2.empty()){
+		cout << "variable 2 is empty!" << endl;
+		exit(-333);
+	}
+	if(O2.empty()){
+		cout << "objective 2 is empty!" << endl;
+		exit(-444);
+	}
+#endif
+
+	//dominance counters
+	unsigned int nGreater=0;
+	unsigned int nLess=0;
+
+	/*the names below correspond to map's iterator clause
+	 *namely, first is the key
+	 *		second is the value of the corresponding key
+	 */
+
+
+
+	for (unsigned int i=0 ; i< O1.size() ; i++) {
+		//"gurnaei" tis times tou second,
+		//plh8os epanalhpsewn oso megalo einai to objective function vector
+
+		if ( (O1[i]-O2[i]) > 0 ) // xreiazetai kai ena shmeio
+			nGreater++ ;
+		else
+			if ( (O1[i]-O2[i]) < 0 )
+				nLess++ ;
+		// (int) O1[i]-O2[i] . this is to be compared with size of the objective vector. if equals, then return 1
+
+	}
+	if (nGreater > 0 && nLess==0)
+		return -1 ;
+	else if (nLess > 0 && nGreater==0 )
+		return 1 ;
+	else
+		return 0 ;
+
+}
+
+
+
+
+
+
+
+//Algorithm 3
+int Container2::removeDominatedPoints(){
+	int number_of_points_prior_removal=size();
+	iterator itA, itB;
+	std::deque<Point2> toBeRemoved;
+	for(itA=begin() ; itA!=end() ; ++itA)
+		for(itB=begin() ; itB!=end() ; ++itB)
+			if( !(itA->first == itB->first) && dominates(   itA->first, itA->second   ,    itB->first , itB->second )==1 )
+				toBeRemoved.push_back(itB->first);
+	// remove point from container
+
+	//updates in memory cannot be applied on the fly; that's why I log the points to be removed
+	for(std::deque<Point2>::iterator itC=toBeRemoved.begin()  ; itC!=toBeRemoved.end() ; ++itC )
+		erase(*itC);
+
+	return number_of_points_prior_removal-toBeRemoved.size();
+}
+
+
+//Algorithm 5
+int Container2::addIfNotDominated(const Point2 &V1,const ObjFunction2 &O1){
+	for (iterator it=begin() ; it!= end() ; ++it)
+		if( dominates( it->first , it->second  , V1, O1 )==1)  //first is the existing point
+			return 0;
+	insert( tuple(V1, O1) );
+	return 1;
+}
+
+Point2 Container2::selectRandom(){//container
+	iterator it;
+
+	int jump=rand() % size();
+#ifdef DEBUG
+	cout << "[Cont] among" << size() << " points I have choosen the " << jump+1 << "th element" << endl;
+#endif
+	advance(it=begin(), jump);
+	return it->first;
+}
+
+
+void Container2::displayContainer (){
+	int i=1;
+	cout << "container display" << endl;
+	for(iterator it=begin() ; it != end(); ++it ){
+		cout << i << ". " << it->first << "\t" << it->second <<endl;
+		i++;
+	}
+}
+
+
+
+
+Point Container2::check_memory(){
+	Point empties(2,0);
+	int empty_variables_counter=0, empty_objective_counter=0;
+	for (Container2::const_iterator it1=begin(); it1!=end(); ++it1 ){
+		if(it1->first.size()==0){
+#ifdef DEBUG
+			cout << "empty variable" << endl;
+#endif
+			++empty_variables_counter;
+		}
+		if(it1->second.size()==0){
+#ifdef DEBUG
+			cout << "empty objective" << endl;
+#endif
+			++empty_objective_counter;
+		}
+	}
+#ifdef DEBUG
+	cout << "\tstatus:" << empty_variables_counter << "variables and" << empty_objective_counter << " objectives are empty!" << endl;
+#endif
+	if(empty_variables_counter!=0 or  empty_objective_counter!=0){
+		cout <<" empty variables or objectives exist in memories!" <<endl;
+		exit(-4444);
+	}
+
+	//	list<Point2> toBeRemoved;
+	//	for (Container2::const_iterator it1=begin(); it1!=end(); ++it1 ){
+	//		for (Container2::const_iterator it2=begin(); it2!=end(); ++it2 ){
+	//			for(unsigned int v=0; v< (it1->first.size()) ; ++v )
+	//				if(abs(  it1->first[v]  -    it2->first[v]  ) < 1e-5)
+	//					toBeRemoved.push_back(it2->first);
+	//		}
+	//	}
+
+
+	empties[0]=empty_variables_counter;
+	empties[1]=empty_objective_counter;
+	return empties;
+}
+
+//int Container2::save_container_snapshot(char const *save_path, int evaluations_counter){
+//	//create the ./memories/MTM_snapXXXXX.txt , where XXXX the current number of evaluations
+//	//create the ./memories/IM_snapXXXXX.txt , where XXXX the current number of evaluations
+//	//create the ./memories/HISTORY_snapXXXXX.txt , where XXXX the current number of evaluations
+//
+//	std::ofstream SAVEfile;
+//
+//	char* result = new char[strlen(save_path)+sizeof(evaluations_counter)+50];
+//	sprintf(result,"%s%s%d%s",save_path,"_snap",evaluations_counter,".txt");
+//
+//	SAVEfile.open ( result ,  ios::out  );
+//	int entries_saved=0;
+//	for(iterator it=begin() ; it != end() ; ++it){
+//		SAVEfile  << it->first << "\t";
+//		SAVEfile  << it->second << "\t" << endl;
+//
+//		++entries_saved;
+//		//cout << "temp saving" << entries_saved << endl;
+//	}
+//	SAVEfile.close();
+//	delete result;
+//	return entries_saved;
+//}
+
+
+int Container2::save_container_snapshot(char const *save_path, int evaluations_counter){
+	//create the ./memories/MTM_snapXXXXX.txt , where XXXX the current number of evaluations
+	//create the ./memories/IM_snapXXXXX.txt , where XXXX the current number of evaluations
+	//create the ./memories/HISTORY_snapXXXXX.txt , where XXXX the current number of evaluations
+
+	std::ofstream SAVEfile;
+	char* result = new char[strlen(save_path)+sizeof(evaluations_counter)+50];
+	sprintf(result,"%s%s%d%s",save_path,"_snap",evaluations_counter,".txt");
+
+	SAVEfile.open ( result ,  ios::out  );
+	int entries_saved=0;
+	for(iterator it=begin() ; it != end() ; ++it){
+		SAVEfile  << it->first << "\t";
+		SAVEfile  << it->second << "\t" << endl;
+
+		++entries_saved;
+		//cout << "temp saving" << entries_saved << endl;
+	}
+	SAVEfile.close();
+	delete[] result;
+	return entries_saved;
+}
+
+
+int Container2::report_optima_plot(char const *save_path){
+	std::ofstream SAVEfile;
+	SAVEfile.open ( save_path ,  ios::out  );
+
+	int entries_saved=0;
+	for(iterator it=begin() ; it != end() ; ++it){
+		SAVEfile  << it->second << "\t" << endl;
+		++entries_saved;
+	}
+	SAVEfile.close();
+	return entries_saved;
+}
+int Container2::report_optima_current(char const *save_path){
+	ofstream SAVEfile;
+	SAVEfile.open ( save_path ,  ios::out  );
+
+	int entries_saved=0;
+	for(iterator it=begin() ; it != end() ; ++it){
+		SAVEfile  << " variable vector "<< it->first << "\t ; objectives vector";
+		SAVEfile  << it->second << endl;
+		++entries_saved;
+	}
+	SAVEfile.close();
+	return entries_saved;
+}
+
+int Container2::load_container(char const *load_path){
+	unsigned int i;
+	int entries_saved=0;
+	double buffer;
+	ifstream LOADfile;
+	LOADfile.open ( load_path  );
+	Point2 tempPoint(local_nVar, 0.0);
+	ObjFunction2 tempObjFun(local_nObj, 0.0);
+
+
+	cout << " check point is reading from" << load_path << " file "<< endl;
+	cout << "\t" << tempPoint.size() << " variables " << tempObjFun.size() << " objectives... " << endl;
+
+	while( LOADfile >> buffer){
+		//cout << "in loop" <<endl;
+		for(i=0; i<tempPoint.size()  ; ++i){
+			//reads one element at a time (ON THE SAME LINE)
+			tempPoint[i]=buffer;
+			//bufferVector.push_back(buffer); //feeds the above element into the vector, until the line "entry" is replicated into the vector
+			LOADfile >> buffer;
+		} //that's for the key
+
+		for(i=0; i<tempObjFun.size()-1 ; ++i){
+			//reads one element at a time (ON THE SAME LINE)
+			tempObjFun[i]=buffer;
+			//bufferVector2.push_back(buffer); //feeds the above element into the vector, until the line "entry" is replicated into the vector
+			LOADfile >> buffer;
+
+		}
+		tempObjFun[i]=buffer;
+		//bufferVector2.push_back(buffer);
+		//the two pairs of lines above are for the obj.value
+		//cout << j++ << ". V1=" << bufferVector   << "-- V2= " << bufferVector2 << endl;
+
+
+		insert( entry( tempPoint,tempObjFun ) );
+
+	}
+
+
+
+
+	LOADfile.close();
+	cout << "\ttotally" << size() << " points loaded" << endl;
+
+
+
+#ifdef REPORT_CONTAINERS
+	displayContainer();
+	cout << "load finished!" <<endl;
+#endif
+	return entries_saved;
+}
+
+double Container2::calculate_hypervolume2D(const ObjFunction2 &reference_point){
+	ObjFunction2 tempv1, tempv2;
+	set<ObjFunction2> counter_table;
+
+
+	for(iterator it=begin(); it != end() ; ++it ){
+		counter_table.insert(it->second);
+	}
+	//uncomment for 2D HV
+	double reference_point_x, reference_point_y;
+	double newpoint_x, newpoint_y;
+	double previous_point_x, previous_point_y;
+	ObjFunction2 temp1;
+	double hypervolume=0.0;
+	reference_point_x= reference_point[0];
+	reference_point_y= reference_point[1];
+
+
+
+	set<ObjFunction2>::iterator it1=counter_table.begin();
+	////iterator iti=begin();
+
+	newpoint_x=(*it1)[0];
+	newpoint_y=(*it1)[1];
+	++it1;
+
+
+#ifdef DEBUG
+	cout << "\tnew point values are " << newpoint_x << "," << newpoint_y << endl;
+#endif
+
+
+	hypervolume+=fabs(newpoint_y - reference_point_y ) * fabs(newpoint_x - reference_point_x );
+
+	previous_point_x = newpoint_x;
+	previous_point_y = newpoint_y;
+
+
+	while(it1!=counter_table.end()){
+
+		++it1;
+		newpoint_x=(*it1)[0]; //update point
+		newpoint_y=(*it1)[1];
+
+
+
+		temp1[0]=newpoint_x;
+		temp1[1]=newpoint_y;
+
+
+		if(previous_point_x!=newpoint_x)
+			hypervolume+=fabs(newpoint_y - previous_point_y ) * fabs(newpoint_x - reference_point_x );
+
+
+		previous_point_x = newpoint_x;
+		previous_point_y = newpoint_y;
+
+
+
+	}
+
+
+	return hypervolume;
+}
+
+double Container2::calculate_quality_indicator(const ObjFunction2 &reference_point){
+	//container could be const, but I do not change it either way!
+#ifdef DEBUG
+	cout << "hyper volume calculation START" << endl;
+	cout << "\tPoints to evaluate"<< size() << endl;
+	cout << "\t with Reference point set to " << reference_point << endl;
+
+#endif
+
+
+
+
+
+	ObjFunction2 tempv1, tempv2;
+	set<ObjFunction2> counter_table;
+
+
+	for(iterator it=begin(); it != end() ; ++it ){
+		counter_table.insert(it->second);
+	}
+	//isws xreiastei gia mellontikh eukairia (stis n-eggrafes na dinw kapoio pososto extra)
+
+
+
+
+	double hv2=0;
+
+
+	set<ObjFunction2>::iterator itHV=counter_table.begin();
+
+	hv2=euclidean_dist( (*itHV), reference_point);
+
+	++itHV;
+	while( itHV!= counter_table.end()){
+		hv2+=euclidean_dist( (*itHV), reference_point );
+		++itHV;
+	}
+
+
+
+
+
+#ifdef DEBUG
+	cout << "HV = " << hv2 << endl <<endl;
+	cout << "hyper volume calculation END" << endl;
+#endif
+	return hv2;
+}
+
+int Container2::activate_kick(char const  *save_directory, int const kick_limit, ObjFunction2 failedObjectives){
+	/*
+	 * checks the current container and counts the frequency of the same objective vector
+	 * [the variable vector, might be the same, but the objective is the same - multi-modality]
+	 * if any entry exists more than kik_limit times, then the function will return 1.
+	 *
+	 * combined with the number of consecutive non-improvements, will perform restart move!
+	 *
+	 */
+	//todo kalutera na sunduastei etsi wste AN upervei to kicklimit KAI an den uparxoun sunexeis anakalupseis
+	//tote na ginei restart tuxaia apo kapoio allo shmeio ws vase point, an auto den doulepsei gia
+	// K fores, tote na kanei reduce move.
+
+	ofstream kick_file;
+	kick_file.open ( save_directory ,  ios::out  );
+
+	int max=0;
+	vector<int> count(size(),0);
+
+	iterator it;
+	int counter;
+
+	ObjFunction2 temp;
+	map<ObjFunction2, int> occurances;
+	set<ObjFunction2> counter_table;
+	ObjFunction2 tempv1, tempv2;
+
+	for( it=begin(); it != end() ; ++it ){
+		counter_table.insert(it->second);
+	}
+
+	for( set<ObjFunction2>::const_iterator it2=counter_table.begin(); it2 != counter_table.end() ; ++it2 ){
+		counter=0;
+		copy_contents(tempv2, *it2);
+
+		for( it=begin(); it != end() ; ++it ){
+			copy_contents(tempv1, it->second);
+			if( compare_error (it->second, *it2) and tempv1!=failedObjectives)
+				//if( compare_error (tempv1, tempv2) and tempv1!=failedObjectives)
+				++counter;
+		}
+		occurances[*it2]=counter;
+	}
+
+	max=0;
+	for ( map<ObjFunction2, int>::iterator it3=occurances.begin(); it3!=occurances.end(); ++it3){
+		if( it3->second > max )
+			max=it3->second;
+
+		kick_file << fixed <<  it3->first << " appears " << it3->second << "times" << endl;
+	}
+
+
+
+	kick_file.close();
+#ifdef DEBUG
+	cout << "active_kick" << max << endl;
+#endif
+	if(max>kick_limit)
+		return 1;
+
+	return 0;
+}
+
+int Container2::count_evaluations(ObjFunction2 given_penalty_vector){
+	unsigned int number=0;
+
+	for(Container2::const_iterator it=begin(); it!=end(); ++it)
+		if(it->second!=given_penalty_vector)
+			++number;
+
+	return number;
+}
+
+mapping_tuple::mapping_tuple(Point2 P_arg, ObjFunction2 O_arg):Pnt(P_arg), ObjF(O_arg){
+
+}
+
+
+//extended_container::extended_container(const char* name, int nVar, int nObj, int other_data_length):
+//										internal_name(name),
+//										internal_nVar(nVar),
+//										internal_nObj(nObj),
+//										internal_other_data_length(other_data_length),
+//										temp_tuple(mapping_tuple(Point2(nVar,0),ObjFunction2(nObj,0))),
+//										temp_vector(vector<int>(2,0)){
+//
+//	cout << " extended container: " << internal_name << " has just been created with ";
+//	cout << internal_nVar << "vars ," << internal_nObj << "objs and " << internal_other_data_length  << "statistics length "<< endl;
+//
+//}
+//
+//void extended_container::import_tuple(Point2 P, ObjFunction2 O, int iteration_counter, int evaluation_order){
+//	const mapping_tuple temp_tuple(P,O);
+//	vector<int> temp_v(2,0);
+//	temp_v[0]=iteration_counter;
+//	temp_v[1]=evaluation_order;
+//
+//	//	extended_container::iterator it=begin();
+//	//	insert(*it, std::pair< const mapping_tuple, vector<int> > ( temp_tuple, temp_v) );
+//	//	insert( std::pair< mapping_tuple, std::vector<int> >( temp_tuple, temp_v));
+//}
+//
+//void extended_container::save_to_file(char* filename){
+//	ofstream output_file(filename);
+//	extended_container::iterator it;
+//	for(extended_container::iterator it=begin() ; it!=end() ; ++it){
+//		output_file << it->first.Pnt << "\t" << it->first.ObjF << "\t" << it->second << endl;
+//	}
+//	output_file.close();
+//}
+
+template<typename T>
+ObjFunction2 ObjectiveFunctionBasic<T>::eval_ZDT1(Point2 &input)
+{
+	if( input.size() != 30){
+		cout << " ZDT1 input has" << input.size() << "variables, instead of 30" << endl;
+		exit(-100);
+	}
+	int i = 0;
+	int n = input.size();
+	double f1 = 0;
+	double g = 0;
+	double h = 0;
+	ObjFunction2 output(2,0.0);
+
+	assert(n == 30); //variable vector length
+	assert(output.size() == 2);
+
+	f1 = input[0];
+
+	for (i = 1; i < n; i++)
+	{
+		g += input[i];
+	}
+	g = 1 + 9 * g / (n-1);
+	h = 1 - sqrt(f1 / g);
+
+	output[0]=f1;
+	output[1] = g * h;
+
+	return output;
+}
+
+template<typename T>
+ObjFunction2 ObjectiveFunctionBasic<T>::eval_ZDT2(Point2 &input)
+{
+	if( input.size() != 30){
+		cout << " ZDT3 input has" << input.size() << "variables, instead of 30" << endl;
+		exit(-100);
+	}
+	int i = 0;
+	int n = input.size();
+	double f1 = 0;
+	double g = 0;
+	double h = 0;
+	ObjFunction2 output(2,0.0);
+
+	assert(n == 30); //variable vector length
+	assert(output.size() == 2);
+
+	f1 = input[0];
+
+	for (i = 1; i < n; i++)
+	{
+		g += input[i];
+	}
+	g = 1 + 9 * g / (n-1);
+	h = 1 - pow(f1 / g, 2);
+
+	output[0]=f1;
+	output[1] = g * h;
+
+	return output;
+}
+
+template<typename T>
+ObjFunction2 ObjectiveFunctionBasic<T>::eval_ZDT3(Point2 &input)
+{
+	if( input.size() != 30){
+		cout << " ZDT3 input has" << input.size() << "variables, instead of 30" << endl;
+		exit(-100);
+	}
+	int i = 0;
+	int n = input.size();
+	double f1 = 0;
+	double g = 0;
+	double h = 0;
+	ObjFunction2 output(2,0.0);
+
+	assert(n == 30); //variable vector length
+	assert(output.size() == 2);
+
+	f1 = input[0];
+
+	for (i = 1; i < n; i++)
+	{
+		g += input[i];
+	}
+	g = 1 + 9 * g / (n-1);
+	h = 1 - sqrt(f1 / g) - (f1 / g) * sin(10 * pi * f1);
+
+	output[0]=f1;
+	output[1] = g * h;
+
+	return output;
+}
+
+template<typename T>
+ObjFunction2 ObjectiveFunctionBasic<T>::eval_ZDT4(Point2 &input)
+{
+	if( input.size() != 10){
+		cout << " ZDT4 input has" << input.size() << "variables, instead of 10" << endl;
+		exit(-100);
+	}
+	int i = 0;
+	int n = input.size();
+	double f1 = 0;
+	double g = 0;
+	double h = 0;
+	ObjFunction2 output(2,0.0);
+
+	assert(n == 10); //variable vector length
+	assert(output.size() == 2);
+
+	f1 = input[0];
+
+	for (i = 1; i < n; i++)
+	{
+		double x = input[i];
+		g += x * x - 10 * cos(4 * pi * x);
+	}
+	g = 1 + 10 * (n - 1) + g;
+	h = 1 - sqrt(f1 / g);
+
+	output[0]=f1;
+	output[1] = g * h;
+
+	return output;
+}
+
+template<typename T>
+ObjFunction2  ObjectiveFunctionBasic<T>::eval_ZDT6(Point2 &input)
+{
+	if( input.size() != 10){
+		cout << " ZDT6 input has" << input.size() << "variables, instead of 10" << endl;
+		exit(-100);
+	}
+	int i = 0;
+	int n = input.size();
+	double f1 = 0;
+	double g = 0;
+	double h = 0;
+	ObjFunction2 output(2,0.0);
+
+	assert(n == 10); //variable vector length
+	assert(output.size() == 2);
+
+	f1 = 1 - exp(-4 * input[0]) * pow(sin(6 * pi * input[0]), 6);
+
+	for (i = 1; i < n; i++)
+	{
+		g += input[i];
+	}
+	g = 1 + 9 * pow(g / (n-1), 0.25);
+	h = 1 - pow(f1 / g, 2);
+
+
+
+	output[0]=f1;
+	output[1] = g * h;
+
+	return output;
+}
+
+template<typename T>
+ObjFunction2  ObjectiveFunctionBasic<T>::eval_DTLZ1(Point2 &input, unsigned int const nObj_size)
+{
+	ObjFunction2 output(nObj_size,0.0);
+	int i = 0;
+	int j = 0;
+	int n = input.size();
+	int k = n - output.size() + 1;
+
+	double g = 0;
+	for (i = n - k + 1; i <= n; i++)
+	{
+		g += pow(input[i-1]-0.5,2) - cos(20 * pi * (input[i-1]-0.5));
+	}
+	g = 100 * (k + g);
+
+	for (i = 1; i <= output.size(); i++)
+	{
+		double f = 0.5 * (1 + g);
+		for (j = output.size() - i; j >= 1; j--)
+		{
+			f *= input[j-1];
+		}
+		if (i > 1)
+		{
+			f *= 1 - input[(output.size() - i + 1) - 1];
+		}
+
+		output[i-1] = f;
+	}
+
+
+
+	return output;
+}
+
+template<typename T>
+ObjFunction2  ObjectiveFunctionBasic<T>::eval_DTLZ2(Point2 &input, unsigned int const nObj_size)
+{
+	ObjFunction2 output(nObj_size,0.0);
+	int i = 0;
+	int j = 0;
+	int n = input.size();
+	int k = n - output.size() + 1;
+
+	double g = 0;
+	for (i = n - k + 1; i <= n; i++)
+	{
+		g += pow(input[i-1]-0.5,2);
+	}
+
+	for (i = 1; i <= output.size(); i++)
+	{
+		double f = (1 + g);
+		for (j = output.size() - i; j >= 1; j--)
+		{
+			f *= cos(input[j-1] * pi / 2);
+		}
+		if (i > 1)
+		{
+			f *= sin(input[(output.size() - i + 1) - 1] * pi / 2);
+		}
+
+		output[i-1] = f;
+	}
+
+
+
+	return output;
+}
+
+
+
+template<typename T>
+ObjFunction2  ObjectiveFunctionBasic<T>::eval_DTLZ3(Point2 &input, unsigned int const nObj_size)
+{
+	ObjFunction2 output(nObj_size,0.0);
+	int i = 0;
+	int j = 0;
+	int n = input.size();
+	int k = n - output.size() + 1;
+
+	double g = 0;
+	for (i = n - k + 1; i <= n; i++)
+	{
+		g += pow(input[i-1]-0.5,2) - cos(20 * pi * (input[i-1]-0.5));
+	}
+	g = 100 * (k + g);
+
+	for (i = 1; i <= output.size(); i++)
+	{
+		double f = (1 + g);
+		for (j = output.size() - i; j >= 1; j--)
+		{
+			f *= cos(input[j-1] * pi / 2);
+		}
+		if (i > 1)
+		{
+			f *= sin(input[(output.size() - i + 1) - 1] * pi / 2);
+		}
+
+		output[i-1] = f;
+	}
+
+
+
+	return output;
+}
+
+template<typename T>
+ObjFunction2  ObjectiveFunctionBasic<T>::eval_DTLZ4(Point2 &input, unsigned int const nObj_size)
+{
+	ObjFunction2 output(nObj_size,0.0);
+	int i = 0;
+	int j = 0;
+	double alpha = 100;
+	int n = input.size();
+	int k = n - output.size() + 1;
+
+	double g = 0;
+	for (i = n - k + 1; i <= n; i++)
+	{
+		g += pow(input[i-1]-0.5,2);
+	}
+
+	for (i = 1; i <= output.size(); i++)
+	{
+		double f = (1 + g);
+		for (j = output.size() - i; j >= 1; j--)
+		{
+			f *= cos(pow(input[j-1],alpha) * pi / 2);
+		}
+		if (i > 1)
+		{
+			f *= sin(pow(input[(output.size() - i + 1) - 1],alpha) * pi / 2);
+		}
+
+		output[i-1] = f;
+	}
+
+
+
+	return output;
+}
+
+template<typename T>
+ObjFunction2  ObjectiveFunctionBasic<T>::eval_DTLZ5(Point2 &input, unsigned int const nObj_size)
+{
+	ObjFunction2 output(nObj_size,0.0);
+	int i = 0;
+	int j = 0;
+	int n = input.size();
+	int k = n - output.size() + 1;
+	double *theta = new double[output.size()];
+	double t = 0;
+	double g = 0;
+
+	for (i = n - k + 1; i <= n; i++)
+	{
+		g += pow(input[i-1] - 0.5, 2);
+	}
+
+	t = pi / (4 * (1 + g));
+	theta[0] = input[0] * pi / 2;
+	for (i = 2; i <= output.size() - 1; i++)
+	{
+		theta[i-1] = t * (1 + 2 * g * input[i-1]);
+	}
+
+	for (i = 1; i <= output.size(); i++)
+	{
+		double f = (1 + g);
+		for (j = output.size() - i; j >= 1; j--)
+		{
+			f *= cos(theta[j-1]);
+		}
+		if (i > 1)
+		{
+			f *= sin(theta[(output.size() - i + 1) - 1]);
+		}
+
+		output[i-1] = f;
+	}
+
+	free(theta);
+
+
+	return output;
+}
+
+template<typename T>
+ObjFunction2  ObjectiveFunctionBasic<T>::eval_DTLZ6(Point2 &input, unsigned int const nObj_size)
+{
+	ObjFunction2 output(nObj_size,0.0);
+	int i = 0;
+	int j = 0;
+	int n = input.size();
+	int k = n - output.size() + 1;
+	double *theta = new double[output.size()] ;
+	double t = 0;
+	double g = 0;
+
+	for (i = n - k + 1; i <= n; i++)
+	{
+		g += pow(input[i-1], 0.1);
+	}
+
+	t = pi / (4 * (1 + g));
+	theta[0] = input[0] * pi / 2;
+	for (i = 2; i <= output.size() - 1; i++)
+	{
+		theta[i-1] = t * (1 + 2 * g * input[i-1]);
+	}
+
+	for (i = 1; i <= output.size(); i++)
+	{
+		double f = (1 + g);
+		for (j = output.size() - i; j >= 1; j--)
+		{
+			f *= cos(theta[j-1]);
+		}
+		if (i > 1)
+		{
+			f *= sin(theta[(output.size() - i + 1) - 1]);
+		}
+
+		output[i-1] = f;
+	}
+
+	free(theta);
+
+
+	return output;
+}
+
+template<typename T>
+ObjFunction2  ObjectiveFunctionBasic<T>::eval_DTLZ7(Point2 &input, unsigned int const nObj_size)
+{
+	ObjFunction2 output(nObj_size,0.0);
+	int i = 0;
+	int j = 0;
+	int n = input.size();
+	int k = n - output.size() + 1;
+	double g = 0;
+	double h = 0;
+
+	for (i = n - k + 1; i <= n; i++)
+	{
+		g += input[i-1];
+	}
+	g = 1 + 9 * g / k;
+
+	for (i = 1; i <= output.size() - 1; i++)
+	{
+		output[i-1] = input[i-1];
+	}
+
+	for (j = 1; j <= output.size() - 1; j++)
+	{
+		h += input[j-1] / (1 + g) * (1 + sin(3 * pi * input[j-1]));
+	}
+	h = output.size() - h;
+	output[output.size() - 1] = (1 + g) * h;
+
+
+
+	return output;
+}
+
+
+template<typename T>
+ObjFunction2  ObjectiveFunctionBasic<T>::eval_COMET(Point2 &input)
+{
+	double x1;
+	double x2;
+	double x3;
+	double g;
+	ObjFunction2 output(3,0.0);
+
+	assert(input.size() == 3);
+	assert(output.size() == 3);
+
+	x1 = 1 + (input[0] * 2.5);
+	x2 = -2 + (input[1] * 4);
+	x3 = input[2];
+
+	g = x3;
+
+	output[0] = (1 + g) * (pow(x1,3) * pow(x2,2) - 10 * x1 - 4 * x2);
+	output[1] = (1 + g) * (pow(x1,3) * pow(x2,2) - 10 * x1 + 4 * x2);
+	output[2] = 3 * (1 + g) * pow(x1,2);
+
+	output[0] = output[0] + 100;
+	output[1] = output[1] + 100;
+	//output[2] = output[2];
+
+
+	return output;
+}
+
+
+
+
+
+
+temp_Container2::temp_Container2 (){
+	srand((unsigned)(time(0)+4682));
+} //default constructor
+
+
+//Algorithm 6e
+Point2 temp_Container2::selectRandom(){//temp_container
+
+	iterator it;
+	int jump=rand() % size();
+#ifdef DEBUG
+	cout << "[tmp2_C] among" << size() << " points I have choosen the " << jump+1 << "th element" << endl;
+#endif
+	advance(it=begin(), jump);
+	//advance(it=begin(),  RandomNumber(0, size())  );
+	return *it;
+}
+
+void temp_Container2::displayContent(){
+	cout << "\t show temp_container" << endl;
+	cout << "\t its size is=" << size() << endl;
+
+	iterator itt=begin();
+	int vector_size = itt->size();
+	int k=1;
+	for( iterator itC=begin()  ; itC != end() ; ++itC){
+		cout << "\t" << k <<":\t" << *itC << endl;
+		k++;
+
+	}
+	cout << "\t its size is=" << size() << endl;
+	cout << "\t entry size is=" << vector_size  << endl;
+	cout << "end of container / bestpoints" << endl;
+}
+
+int temp_Container2::checkduplicate(){
+	int total=0;
+	iterator previous;
+	iterator itC=begin();
+	previous = itC;
+	++itC;
+	for(    ; itC != end() ; ++itC){
+		if(*itC == *previous)
+			total++;
+
+		++previous;
+	}
+
+	return total;
+}
+
+////////////////////////////////////////////
+//temp_container2 end
+////////////////////////////////////////
+
+
+
+/////////////////////////////
+//LTM_Container
+/////////////////////////////////
+//template <typename T>
+
+
+
+//template <typename T>
+//LTM_Container2Basic2<T>::LTM_Container2Basic2 (   LTM_Container2Basic2<T> const &L){} //copy constructor
+
+//template <typename T>
+//LTM_Container2Basic2<T> & LTM_Container2Basic2<T>::operator= ( LTM_Container2Basic2<T> const &other) {
+//
+//	local_nVar= other.local_nVar;
+//	local_nRegions=other.local_nRegions;
+//
+//	Region = new set<Point2>[other.local_nRegions];
+//
+//	local_lower_bound=other.local_lower_bound;
+//	local_upper_bound=other.local_upper_bound;
+//
+//	tempVector=other.tempVector;
+//
+//
+//
+//
+//	offset =0.00001; //DBL_MIN ; //0.0000000000000001;  //DBL_MIN is 1E-37
+//	srand(time(NULL)+4425);
+//	return *this;
+//
+//}
+
+template <typename T>
+LTM_Container2Basic2<T>::LTM_Container2Basic2(const int &nVar,const int &nRegion, const Point2 &lower_bound, const Point2 &upper_bound ) :
+local_nVar(nVar),
+local_nRegions(nRegion),
+Region (new set<Point2>[local_nRegions]),
+local_lower_bound(Point2(lower_bound)),
+local_upper_bound(Point2(upper_bound)),
+tempVector(Point2(nVar,0.0)),
+offset(0.00001),  //DBL_MIN ; //0.0000000000000001;  //DBL_MIN is 1E-37
+// nRegions are defined by nRegions+1 points!!!, each regions is identified by its lower_bound point
+//i.e. 3rd region should be chosen by range_points[2]
+range_points(Point2(local_nRegions + 1, 0.0)),
+variable_range_points(vector<Point2>(nVar, range_points)) // [variable_index][region_index]
+{
+
+
+	Point2 local_regions_vector(nVar,local_nRegions);
+	Point2 local_step=(local_upper_bound-local_lower_bound)/ local_regions_vector;
+
+	//		for(int i=0;i<nVar;++i)
+	//			local_range[i]=local_upper_bound[i]-local_lower_bound[i];
+
+	srand(time(NULL)+4425);
+
+	cout << "so far: " << endl;
+	cout << "number of variables for each design "
+			<< variable_range_points.size() << endl;
+	cout << "\t each variable has " << local_nRegions << " regions, defined by "
+			<< range_points.size() << " points " << endl;
+
+	//create regions
+	for (int v = 0; v < nVar; ++v) {
+		for (unsigned int r = 0; r < range_points.size(); ++r) {
+			range_points[r] = lower_bound[v] + local_step[v] * r;
+		}
+		variable_range_points[v] = range_points;
+		//		variable_range_points.push_back(range_points);
+	}
+
+	//report the regions
+	for(int v=0; v<nVar; ++v) {
+		cout<< endl << "variable " << v << " range_points: " <<endl;
+		for(unsigned int r=0; r<range_points.size(); ++r)
+			cout << " \t" << variable_range_points[v][r];
+	}
+	cout << endl;
+
+
+}
+
+template <typename T>
+LTM_Container2Basic2<T>::~LTM_Container2Basic2(){
+	//	for (unsigned int i=0; i<local_nRegions; ++i )
+	//		Region[i].clear();
+	//	delete [] Region;
+//	 variable_range_points;
+	cout <<"LTM memories deleted!</main>" << endl;
+
+}
+
+
+template <typename T>
+T LTM_Container2Basic2<T>::RandomNumber(T min, T max){
+	T r = rand() /  ((T)RAND_MAX );
+	return (T)(min + r * (max - min));
+}
+
+
+
+
+
+template <typename T>
+Point2 LTM_Container2Basic2<T>::generate_Random_Point_From_Least_Visited_Region2(){
+	//todo , improve!!! na diavazei apo to HISTORY, OXI apo to LTM!
+
+
+	//classify the points
+
+	//this counts the occurrences for each region!
+	//this is not the same as the range_points above!!!!
+	vector<int> zero_vector(local_nRegions, 0);
+	vector<vector<int> > region_counters(local_nVar, zero_vector); // [variable_index][region_index]
+
+	//for each entry
+	for (const_iterator it = begin(); it != end(); ++it) {
+		//for each component of the entry
+		for (unsigned int v = 0; v < local_nVar; ++v) {
+			for (unsigned int r = 0; r < local_nRegions; ++r)
+				if (variable_range_points[v][r] <= (*it)[v]  and (*it)[v] <= variable_range_points[v][r + 1]) {
+					++region_counters[v][r];
+#ifdef DEBUG
+					cout << "\t" << (*it)[v] << " belongs to" << variable_range_points[v][r] << " and " << variable_range_points[v][r+1] << endl;
+#endif
+				}
+		}
+#ifdef DEBUG
+		cout << endl;
+#endif
+		//choose where does it belong
+
+		//		variable_range_points[v][r];
+
+	}
+	//report intermediate classification results
+	cout << "classification results1" << endl;
+	for (unsigned int r = 0; r < local_nRegions; ++r) {
+		cout << " region " << r << " counted: " << endl;
+		for (unsigned int v = 0; v < local_nVar; ++v) {
+			cout << " \t" << region_counters[v][r]
+			                                    << " Occurrences of variable " << v << endl;
+		}
+	}
+
+	cout << "classification results2" << endl;
+	for (unsigned int v = 0; v < local_nVar; ++v) {
+		cout << " frequencies for variable " << v << " : " << endl;
+		for (unsigned int r = 0; r < local_nRegions; ++r) {
+			cout << " \t" << region_counters[v][r] << " Occurrences in region "
+					<< r << endl;
+		}
+	}
+	//find minimum region
+	vector<int> minimum_region(local_nVar, -1);
+
+	for (unsigned int v = 0; v < local_nVar; ++v) {
+
+		int min = region_counters[v][0];
+		int temp_min_reg = 0;
+		//		cout << "v:" << v << "r=0 f:" << region_counters[v][0] << endl;
+		for (unsigned int r = 1; r < local_nRegions; ++r) {
+			//			cout << "v:" << v << "r=" << r << " f:" << region_counters[v][r] << endl;
+			if (region_counters[v][r] < min) {
+				min = region_counters[v][r];
+
+				temp_min_reg = r;
+			}
+		}
+
+		minimum_region[v] = temp_min_reg;
+	}
+	//report minimum region
+	cout << "minumum region is" << endl;
+
+	for (unsigned int v = 0; v < local_nVar; ++v)
+		cout << " \t " << minimum_region[v];
+	cout << endl;
+
+	//generate a point from the minimum region
+
+	cout << "generated_point" << endl;
+	vector<double> output(local_nVar, 0.0);
+	for (unsigned int v = 0; v < local_nVar; ++v) {
+		int temp_min_reg = minimum_region[v];
+		output[v] = RandomNumber(variable_range_points[v][temp_min_reg],
+				variable_range_points[v][temp_min_reg + 1]);
+		cout << "\t" << output[v];
+	}
+	cout << endl;
+	return output;
+}
+
+
+
+template <typename T>
+int LTM_Container2Basic2<T>::leastVisitedRegion(){
+	int key=0;
+	unsigned int min=Region[0].size();
+	for (unsigned int i=1 ; i < local_nRegions ; ++i)
+		if(Region[i].size()<min)
+			key=i;
+
+	return key;
+}
+
+template <typename T>
+void LTM_Container2Basic2<T>::showContents(){
+	int m;
+	int total_size=0;
+	cout << "\t LTM contents" << endl;
+	for(int i=0; i< local_nRegions; ++i)
+		total_size+=Region[i].size();
+
+	cout << "\t ltm size=" << total_size << endl;
+
+
+	for(int r=0; r< local_nRegions; ++r){
+		cout << endl<< "Region =" << r << endl;
+		m=1;
+		for( set< Point2 >::iterator it=Region[r].begin() ; it!=Region[r].end() ;++it, ++m)
+			cout << m << ".\t" << ( *it) << endl;
+
+	}
+
+
+}
+
+template <typename T>
+int LTM_Container2Basic2<T>::getSize(){
+	int total_size=0;
+	for (unsigned int i=0; i< local_nRegions ; ++i)
+		total_size+=Region[i].size();
+
+	return total_size;
+}
+
+template <typename T>
+int LTM_Container2Basic2<T>::getSizePerRegion(){
+	int total_size=0;
+	for (int i=0; i< local_nRegions ; ++i){
+		cout << i << ". " << Region[i].size() << endl;
+		total_size+=Region[i].size();
+	}
+
+	return total_size;
+}
+
+template <typename T>
+int LTM_Container2Basic2<T>::getRespetiveRegion(const Point2 &P){
+
+	for (unsigned int i=0; i< local_nRegions ; ++i)
+		if( Region[i].find(P)!=Region[i].end() )
+			return i;
+	return -1;
+}
+
+
+template <typename T>
+void LTM_Container2Basic2<T>::save_ltm_container(char const *save_path, int evaluations_counter){
+	//create the ./memories/LTM_snapXXXXX.txt , where XXXX the current number of evaluations
+	ofstream LTMfile;
+	char* final_save_path = new char[strlen(save_path)+sizeof(evaluations_counter)+50];
+	sprintf(final_save_path,"%s%s%d%s",save_path,"_snap",evaluations_counter,".txt");
+
+	LTMfile.open ( final_save_path,  ios::out  );
+
+
+	for(  set< Point2 >::iterator it=begin() ;  it!=end() ; ++it) //ola ta shmeia se ka8e deque
+		LTMfile << *it  << endl;
+
+	delete[] final_save_path;
+	LTMfile.close();
+}
+
+
+template <typename T>
+void LTM_Container2Basic2<T>::load_ltm_container(char const *save_path){
+	ifstream LTMfile;
+	LTMfile.open ( save_path );
+	//T temp_buffer;
+	Point2 temp_bufferV(local_nVar, 0.0);
+	unsigned int counter=0;
+
+	while( LTMfile>>temp_bufferV[0] ){
+		for (unsigned int v=1; v<local_nVar; ++v)
+			LTMfile>>temp_bufferV[v];
+
+		insert( temp_bufferV );
+		++counter;
+	}
+
+	cout << " totally " << counter << " designs were loaded into LTM" << endl;
+
+
+	LTMfile.close();
+}
+
+
+typedef LTM_Container2Basic2<double> LTM_Container;
+
+
+///////////////////////////////////////////////////////////////////
+/// LTM_Container2Basic2  END
+///////////////////////////////////////////////////////////////////
+
+
+
+
+///////////////////////////////////////////////////////////////////
+/// STM_Container2  START
+///////////////////////////////////////////////////////////////////
+
+
+
+
+//STM_Container2::STM_Container2(){}
+STM_Container2::STM_Container2(const int &input_STM_size, int const n) :  STM_size (input_STM_size), local_nVar(n){
+	//TOCHANGE
+}; //default constructutor
+//STM_Container2::STM_Container2 (const STM_Container2& S){};
+//Cents& operator= (const Cents &cSource);
+//STM_Container& operator= (const STM_Container& S);
+void STM_Container2::import(Point2 const &P){
+	if( !isTabu(P)){
+		if(size() < STM_size )
+			push_front(P);
+		else{
+			pop_back();
+			push_front(P);
+		}
+	}
+
+}
+
+void STM_Container2::showTabu(){
+	int m=0;
+	cout << "\t STM contents" << endl;
+	cout << "\t stm size=" << size() << endl;
+	for (iterator it=begin() ; it!= end() ; ++it){
+		cout << "\t " << m << "th : " << *it << endl;
+		++m;
+	}
+}
+
+/*void remove_duplicates(){
+
+Point2 temp;
+deque< Point2 > toDelete;
+
+map<Point2,int> frequencies;
+
+//discover multiple
+for ( iterator it=begin() ; it!=end() ; ++it )
+if ( frequencies.find( *it )==frequencies.end() )
+frequencies[ *it ] = 1;
+else
+frequencies[ *it ]+=1;
+
+
+
+//mark bad ones
+
+
+for ( map<Point2,int>::iterator it3=frequencies.begin() ; it3!=frequencies.end() ; ++it3 )
+it=1;
+
+
+for ( iterator it=begin() ; it!=end() ; ++it )
+if ( frequencies.find( *it )==frequencies.end() )
+frequencies[ *it ] = 1;
+else
+frequencies[ *it ]+=1;
+
+
+}*/
+
+bool STM_Container2::isTabu(const Point2 &P){
+	//cout << "STM contents" << endl;
+	//for(Container::iterator it=STM.begin() ; it!= STM.end() ; it++) //point==tabuPoint, end is thrown if element is not found
+
+
+	for ( iterator it=begin() ; it!=end() ; ++it)
+		if ( P  == *it )
+			return true;
+	return false;
+}
+
+
+
+
+
+void STM_Container2::save_stm_container(const char* save_path, int evaluations_counter){
+	//create the ./memories/STM_snapXXXXX.txt , where XXXX the current number of evaluations
+
+	ofstream STMfile;
+	char* final_save_path = new char[strlen(save_path)+sizeof(evaluations_counter)+50];
+	sprintf(final_save_path,"%s%s%d%s",save_path,"_snap",evaluations_counter,".txt");
+
+	STMfile.open ( final_save_path  ,  ios::out  );
+
+	for( iterator it= begin() ; it != end() ; ++it)
+		STMfile << *it << endl;
+
+	delete[] final_save_path;
+	STMfile.close();
+}
+
+int STM_Container2::load_stm_container(const char* load_path){
+	double buffer;
+	Point2 tempPoint(local_nVar,0.0);
+	unsigned int i;
+
+	ifstream LOADfile(load_path);
+
+
+	cout << " STM is reading from file"<< load_path << endl;
+	cout << "\t" << tempPoint.size() << " variables " << endl;
+
+	while(LOADfile >> buffer){ //the loop reads through each element
+		for(i=0; i<tempPoint.size()-1 ; ++i){
+			//reads one element at a time (ON THE SAME LINE)
+			tempPoint[i]=buffer; //feeds the above element into the vector, until the line "entry" is replicated into the vector
+			LOADfile >> buffer;
+		}
+		tempPoint[i]=buffer;//for the last element of the current line
+
+		//cout << j++ << ". V1=" << bufferVector << endl;
+
+		push_back(tempPoint);
+
+	}
+	LOADfile.close();
+	cout << "\ttotally " << size() << "STM points loaded" << endl;
+	cout << "----------------------------------------------------" << endl;
+
+#ifdef REPORT_CONTAINERS
+	showTabu();
+	cout << "STM READ" <<endl;
+#endif
+	return size();
+}
+
+
+
+
+
+///////////////
+///tabus
+
+
+ConfigurationSettings::ConfigurationSettings (char const *name) :
+	conf_diversify(0),
+	conf_intensify(0),
+	conf_reduce(0),
+	conf_SS(0.0),
+	conf_SSRF(0.0),
+	conf_save_step(0),
+	conf_n_sample(0),
+	conf_nVar(0),
+	conf_nObj(0),
+	conf_LL(0),
+	conf_EL(0),
+	conf_IL(0), // available values HV / HB
+	conf_nRegions(0),
+	conf_STM_size(0),
+	conf_assessment(""),
+	conf_logtype(""), // available values full/quick
+	conf_starting_point(0),
+	conf_maximum_improvements(0),
+	conf_maximum_duplicates(0){
+	ifstream configuration_file2(name);
+
+
+	cout << "checking for files" << endl;
+
+	cout << "configuration file ...";
+	if( FileExists(name) )
+		cout << " OK!"<< endl;
+	else{
+		cout << "NOT FOUND!!!" << endl;
+		exit(-1000);
+	}
+
+
+
+
+	ifstream configuration_file(name);
+
+	if(   configuration_file.is_open() ){
+
+		cout << "configuration file found! " << endl;
+
+		cout << endl << "Tabu Search Options" << endl;
+		configuration_file >> conf_diversify; //1
+		cout << " 1.diversify " << conf_diversify << endl;
+
+		configuration_file >> conf_intensify; //2
+		cout << " 2.intensify " <<  conf_intensify<< endl;
+
+		configuration_file >> conf_reduce ; //3
+		cout << " 3.reduce " <<  conf_reduce<< endl;
+
+		configuration_file >> conf_SS ; //4
+		cout << " 4.SS " <<  conf_SS<< endl;
+		if( conf_SS==0 )
+			cout << "\t Start step(s) is assigned by user in start_step.txt file!" << endl;
+		else
+			cout << "\t Start step(s) (" << conf_SS <<")  is uniform for all variables" << endl;
+
+		configuration_file >> conf_SSRF ; //5
+		cout << " 5.SSRF " <<  conf_SSRF<< endl;
+
+		configuration_file >> conf_save_step ; //6
+		cout << " 6.save_step " <<  conf_save_step<< endl;
+
+		configuration_file >> conf_n_sample ; //7
+		cout << " 7.n_sample " <<  conf_n_sample<< endl;
+
+		configuration_file >> conf_nVar ; //8
+		cout << " 8.nVar " <<  conf_nVar<< endl;
+
+		configuration_file >> conf_nObj ; //9
+		cout << " 9.nObj " <<  conf_nObj<< endl;
+
+		configuration_file >> conf_LL ; //10
+		cout << " 10.n_of_loops " <<  conf_LL<< endl;
+
+		configuration_file >> conf_EL ; //11
+		cout << " 11.n_of_evaluations " <<  conf_EL<< endl;
+
+		configuration_file >> conf_IL ; //12  : available values HV / HB
+		cout << " 12.n_of_consecutive_improvements " <<  conf_IL<< endl;
+
+		configuration_file >> conf_assessment ; //13
+		cout << " 13.assessment " <<  conf_assessment<< endl;
+
+		configuration_file >> conf_nRegions ; //14
+		cout << " 14.nRegions " <<  conf_nRegions<< endl;
+
+		configuration_file >> conf_STM_size ; //15
+		cout << " 15.STM_size " <<  conf_STM_size<< endl;
+
+		configuration_file >> conf_logtype ; //16 -  available values full/quick
+		cout << " 16.LogType " <<  conf_logtype<< endl;
+
+		configuration_file >> conf_starting_point ; //17
+		cout << " 17.Starting point " <<  conf_starting_point << endl;
+		if( conf_starting_point==0)
+			cout << "\t Starting point is assigned randomly!" << endl;
+		else
+			cout << "\t Starting point is by user from the file datum_design_vector.txt" << endl;
+
+		configuration_file >> conf_maximum_improvements;
+		cout << " 18.maximum_improvements " <<  conf_maximum_improvements<< endl;
+
+		configuration_file >> conf_maximum_duplicates;
+		cout << " 19.maximum_duplicates " <<  conf_maximum_duplicates<< endl;
+
+		/*configuration_file >> Reference_Point_x ; //18a
+cout << " Reference_Point_x " <<  Reference_Point_x<< endl;
+
+configuration_file >> Reference_Point_y ; //18b
+cout << " Reference_Point_y " <<  Reference_Point_y<< endl;*/
+
+
+		configuration_file.close();
+		cout << "configuration file read! " << endl;
+	}else{
+		cout << "NO configuration file found!" <<endl;
+	}
+
+
+
+}
+
+ConfigurationSettings::~ConfigurationSettings(){
+	cout << "end of configuration settings" << endl;
+}
+
+
+void TabuSearch::Push_Base_Point(const Point2 &P,  std::string const entry_function){
+#ifdef DEBUG_PUSH_BASE
+	cout << " within Push_Base_Point" << endl << "\t" << P << endl;
+#endif //DEBUG_PUSH_BASE
+	numerical_check(P, entry_function);
+	Points.push_front(P);
+	iIter=Points.begin();
+	BP_tracer.push_back( BP_tuple(P, entry_function ));
+	MTM.removeDominatedPoints();
+}
+
+template<typename T>
+void TabuSearch::readInputFiles(char const *filepath, std::vector<T> &target_vector ){
+	cout << endl <<  filepath << " file ...";
+
+	if( FileExists(filepath) ){
+		cout << " OK!"<< endl;
+
+		//target_vector=vector<T>(target_vector.size(),0.0);
+
+		ifstream RP(filepath);
+		if(RP.is_open()){
+			for (unsigned int i=0; i< target_vector.size(); ++i)
+				RP>>target_vector[i];
+
+			RP.close();
+			cout << "\t" << filepath << " read " << target_vector << endl;
+		}else{
+			cout <<"no " << filepath << " file was found" << endl;
+
+		}
+	}else{
+		cout << "NOT FOUND!!!" << endl;
+		exit(-1002);
+	}
+
+}
+
+void TabuSearch::TabuList2 (char const *name) {
+	ifstream configuration_file2(name);
+
+
+	cout << "checking for files" << endl;
+
+	cout << "configuration file ...";
+	if( FileExists(name) )
+		cout << " OK!"<< endl;
+	else{
+		cout << "NOT FOUND!!!" << endl;
+		exit(-1000);
+	}
+
+	diversify=0;
+	intensify=0;
+	reduce=0;
+	SS=0.0;
+	SSRF=0.0;
+	save_step=0;
+	n_sample=0;
+	nVar=0;
+	nObj=0;
+	LL=0;
+	EL=0;
+	IL=0; // available values HV / HB
+	assessment="";
+	nRegions=0;
+	STM_size=0;
+	logtype=""; // available values full/quick
+	starting_point=0;
+
+
+
+	ifstream configuration_file(name);
+
+	if(   configuration_file.is_open() ){
+
+		cout << "configuration file found! " << endl;
+
+		cout << endl << "Tabu Search Options" << endl;
+		configuration_file >> diversify; //1
+		cout << " 1.diversify " << diversify << endl;
+
+		configuration_file >> intensify; //2
+		cout << " 2.intensify " <<  intensify<< endl;
+
+		configuration_file >> reduce ; //3
+		cout << " 3.reduce " <<  reduce<< endl;
+
+		configuration_file >> SS ; //4
+		cout << " 4.SS " <<  SS<< endl;
+		if( SS==0 )
+			cout << "\t Start step(s) is assigned by user in start_step.txt file!" << endl;
+		else
+			cout << "\t Start step(s) (" << SS <<")  is uniform for all variables" << endl;
+
+		configuration_file >> SSRF ; //5
+		cout << " 5.SSRF " <<  SSRF<< endl;
+
+		configuration_file >> save_step ; //6
+		cout << " 6.save_step " <<  save_step<< endl;
+
+		configuration_file >> n_sample ; //7
+		cout << " 7.n_sample " <<  n_sample<< endl;
+
+		configuration_file >> nVar ; //8
+		cout << " 8.nVar " <<  nVar<< endl;
+
+		configuration_file >> nObj ; //9
+		cout << " 9.nObj " <<  nObj<< endl;
+
+		configuration_file >> LL ; //10
+		cout << " 10.n_of_loops " <<  LL<< endl;
+
+		configuration_file >> EL ; //11
+		cout << " 11.n_of_evaluations " <<  EL<< endl;
+
+		configuration_file >> IL ; //12  : available values HV / HB
+		cout << " 12.n_of_consecutive_improvements " <<  IL<< endl;
+
+		configuration_file >> assessment ; //13
+		cout << " 13.assessment " <<  assessment<< endl;
+
+		configuration_file >> nRegions ; //14
+		cout << " 14.nRegions " <<  nRegions<< endl;
+
+		configuration_file >> STM_size ; //15
+		cout << " 15.STM_size " <<  STM_size<< endl;
+
+		configuration_file >> logtype ; //16 -  available values full/quick
+		cout << " 16.LogType " <<  logtype<< endl;
+
+		configuration_file >> starting_point ; //17
+		cout << " 17.Starting point " <<  starting_point << endl;
+		if( starting_point==0)
+			cout << "\t Starting point is assigned randomly!" << endl;
+		else
+			cout << "\t Starting point is by user from the file datum_design_vector.txt" << endl;
+
+		configuration_file >> maximum_improvements;
+		cout << " 18.maximum_improvements " <<  maximum_improvements<< endl;
+
+		configuration_file >> maximum_duplicates;
+		cout << " 19.maximum_duplicates " <<  maximum_duplicates<< endl;
+
+		/*configuration_file >> Reference_Point_x ; //18a
+cout << " Reference_Point_x " <<  Reference_Point_x<< endl;
+
+configuration_file >> Reference_Point_y ; //18b
+cout << " Reference_Point_y " <<  Reference_Point_y<< endl;*/
+
+
+		configuration_file.close();
+		cout << "configuration file read! " << endl;
+	}else{
+		cout << "NO configuration file found!" <<endl;
+	}
+
+
+
+}
+
+
+//TabuSearch(){}
+//TabuSearch (const TabuSearch&); //copy
+
+/*
+TabuSearch::TabuSearch( char const *name2){
+
+////int succesfull_copy=0; //gia checkpoints
+nextMoveHookeJeeves=1; //initial value
+diversification=0;
+intensification=0;
+reduction=0;
+
+char const *STM_checkpoint="./memories/checkpoint/STM.txt";
+char const *MTM_checkpoint="./memories/checkpoint/MTM.txt";
+char const *LTM_checkpoint="./memories/checkpoint/LTM.txt";
+char const *IM_checkpoint="./memories/checkpoint/IM.txt";
+char const *HISTORY_checkpoint="./memories/checkpoint/HISTORY.txt";
+
+cout << "Initialising TS" << endl;
+
+//read configuration file
+TabuList2(name2);
+Point2 datumPnt(nVar,0.0);
+ObjFunction2 currentObjFunc(nObj,0.0);
+
+TS_ObjFunc = ObjectiveFunction(nVar,nObj);
+
+MTM=Container2(nVar,nObj, "MTM_cont");
+IM=Container2(nVar,nObj, "IM_cont");
+HISTORY=Container2(nVar,nObj, "HIST_cont");
+
+STM = STM_Container2(STM_size, nVar) ;
+
+LTM = LTM_Container2Basic2<double>( nVar ,  nRegions, TS_ObjFunc.min_bound , TS_ObjFunc.max_bound);
+
+//read external reference point from file - START
+cout << endl <<  "reference point file ...";
+if( FileExists("reference_point.txt") ){
+cout << " OK!"<< endl;
+reference_point=ObjFunction2(nObj,0.0);
+}
+else{
+cout << "NOT FOUND!!!" << endl;
+exit(-1002);
+}
+
+ifstream RP("reference_point.txt");
+if(RP.is_open()){
+for (unsigned int i=0; i< nObj; ++i)
+RP>>reference_point[i];
+
+RP.close();
+cout << "\treference point read " << reference_point << endl;
+}else{
+cout <<"no reference_point.txt file was found" << endl;
+}
+//read external reference point from file - END
+
+
+//read external datum design vector from file - START
+if(starting_point==0){
+ID();//this is needed only for random initialisation
+for (unsigned int i=0; i < datumPnt.size() ; ++i)
+datumPnt[i]=RandomNumber2(TS_ObjFunc.min_bound[i],TS_ObjFunc.max_bound[i]); //RANDOM value for each variable
+
+}else{
+cout << endl << "datum design file ...";
+if( FileExists("datum_design_vector.txt" ) ){
+cout << " OK!"<< endl;
+ifstream DD("datum_design_vector.txt");
+if(DD.is_open()){
+for(unsigned int i=0 ; i<nVar; ++i)
+DD >> datumPnt[i];
+DD.close();
+}else{
+cout << " no datum_design_vector.txt file found in root directory" << endl;
+exit(-200);
+}
+
+cout << "\tdatum design read" << datumPnt << endl;
+}else{
+cout << "WARNING, NOT FOUND!!!" << endl;
+if(starting_point==1){
+cout << " either create a new datum_design_vector.txt file or alter the proper value in the" << name2 << endl;
+exit(-1003);
+}
+}
+}
+//read external datum design vector from file - END
+
+
+
+
+
+
+InitialStep=Point2(nVar,SS); // vector opou apo8hkeyetai to arxiko step
+CurrentStep=Point2(nVar,SS);
+
+if(SS==0)
+readInputFiles("start_step.txt", CurrentStep);
+
+for (unsigned int i=0; i<InitialStep.size(); ++i)
+InitialStep[i]=TS_ObjFunc.range[i]*CurrentStep[i];
+
+
+cout << endl << endl << "Initial Solution is "  << endl << datumPnt << endl;
+
+
+
+
+//    hypervolume.out  i_local.out  im_size.out    step_size.out
+//diversify.out  evals.out  hypervolume.out  i_local.out  im_size.out  intensify.out  step_size.out
+
+
+cout << "SS="<< SS;
+//pros8hkh 24-Oct
+
+cout << "initial step" << endl << "\t" << InitialStep << endl;
+
+
+
+
+//checkpoint!
+if ( FileExists(MTM_checkpoint) && FileExists(MTM_checkpoint) && FileExists(LTM_checkpoint) && FileExists(IM_checkpoint) && FileExists(HISTORY_checkpoint)){
+//since every method will read as a checkpoint AT least one entry, the overall
+//product will be a large positive number. otherwise it will be zero. This is
+//used later on.
+cout << " checkpoint found!" <<endl;
+
+STM.load_stm_container(STM_checkpoint);
+MTM.load_container(MTM_checkpoint);
+IM.load_container(IM_checkpoint);
+HISTORY.load_container(HISTORY_checkpoint);
+LTM.load_ltm_container2(HISTORY,nRegions);
+
+////succesfull_copy=1; // this variable will have the product of the entries read.
+
+cout << "checkpoints are loaded" << endl;
+cout << "selecting random point from MTM" << endl;
+datumPnt=MTM.selectRandom(); //random initialise , DATUM could be used instead
+cout << "random point from MTM is " << endl << datumPnt << "\t ===> ";
+currentObjFunc=MTM[datumPnt];
+cout << currentObjFunc << "\t";
+}
+else{
+cout << " NO checkpoint files found" <<endl;
+cout << "starting a new search" << endl;
+currentObjFunc = TS_ObjFunc.calculateObjFun(datumPnt); // respective obj function
+MTM.insert(entry( datumPnt , currentObjFunc ));
+IM.insert(entry( datumPnt , currentObjFunc ));
+HISTORY.insert(entry( datumPnt , currentObjFunc ) );
+// TODO: to be improved ( 1 sunarthsh pou 8a kanei evaluate points) anti gia to following set entolwn
+}
+
+cout << "initial point & Obj" <<endl;
+cout<< "initial point" << datumPnt  << " maps to " << currentObjFunc << endl;
+
+Push_Base_Point(datumPnt, "initial" );
+};
+
+
+ */
+
+void TabuSearch::read_design_vector_file(int starting_point, char const *filename, char const *file_description, Point2 &Pnt, const Point2 &lower_bound, const Point2 &upper_bound){
+	 if(starting_point==0){
+	 		for (unsigned int i=0; i < Pnt.size() ; ++i)
+	 			Pnt[i]=RandomNumber2(lower_bound[i], upper_bound[i]); //RANDOM value for each variable
+
+	 	}else{
+	 		cout << endl << file_description << " file ...";
+	 		if( FileExists(filename ) ){
+	 			cout << " OK!"<< endl;
+	 			ifstream file_buffer(filename);
+	 			if(file_buffer.is_open()){
+	 				for(unsigned int i=0 ; i<Pnt.size(); ++i)
+	 					file_buffer >> Pnt[i];
+	 				file_buffer.close();
+	 			}else{
+	 				cout << " The file " << filename <<"  was not found in root directory" << endl;
+	 				exit(-200);
+	 			}
+
+	 			cout << "\tdatum design read: " << Pnt << endl;
+	 		}else{
+	 			cout << "WARNING, NOT FOUND!!!" << endl;
+	 			if(starting_point==1){
+	 				cout << " either create a new "<< filename << "  file or alter the proper value in the configuration file!"<< endl;
+	 				exit(-1003);
+	 			}
+	 		}
+	 	}
+}
+
+void TabuSearch::read_objectives_file(char const *filename, char const *file_description, ObjFunction2 &ObjPnt){
+	cout << endl << file_description << " file ...";
+		if( FileExists(filename) ){
+			cout << " OK!"<< endl;
+
+
+			ifstream FILE("reference_point.txt");
+			if(FILE.is_open()){
+				for (unsigned int i=0; i< nObj; ++i)
+					FILE>>ObjPnt[i];
+
+				FILE.close();
+				cout << "\t"<< file_description<< " read: " << ObjPnt << endl;
+			}else{
+				cout << " The file " << filename <<"  was not found in root directory" << endl;
+			}
+		}
+		else{
+			cout << "NOT FOUND!!!" << endl;
+			exit(-1002);
+		}
+}
+
+//TabuSearch(){}
+//TabuSearch (const TabuSearch&); //copy
+TabuSearch::TabuSearch( ConfigurationSettings &conf_set,  int restart_flag_argument): //0 new search, 1 restart from checkpoint memories
+		restart_flag(restart_flag_argument),
+		diversify(conf_set.conf_diversify),//1
+		intensify(conf_set.conf_intensify),//2
+		reduce(conf_set.conf_reduce),//3
+		SS(conf_set.conf_SS),//4
+		SSRF(conf_set.conf_SSRF),//5
+		save_step(conf_set.conf_save_step),//6
+		n_sample(conf_set.conf_n_sample),//7
+		nVar(conf_set.conf_nVar),//8
+		nObj(conf_set.conf_nObj),//9
+		LL(conf_set.conf_LL),//10
+		EL(conf_set.conf_EL),//11
+		IL(conf_set.conf_IL),//12
+		nRegions(conf_set.conf_nRegions),//14
+		STM_size(conf_set.conf_STM_size),//15
+		assessment(conf_set.conf_assessment),//13
+		logtype(conf_set.conf_logtype),//16
+		starting_point(conf_set.conf_starting_point),//17
+		maximum_improvements(conf_set.conf_maximum_improvements),//18
+		maximum_duplicates(conf_set.conf_maximum_duplicates),//19
+
+		TS_ObjFunc(nVar,nObj),
+
+		InitialStep(Point2(nVar,SS)), // vector opou apo8hkeyetai to arxiko step
+		CurrentStep(Point2(nVar,SS)),
+		reference_point(ObjFunction2(nObj,0.0)),
+
+		MTM(nVar,nObj, "MTM_cont"),
+		IM(nVar,nObj, "IM_cont"),
+		HISTORY(nVar,nObj, "HIST_cont"),
+		STM(STM_size,nVar),
+
+		Points( deque<Point2>()),
+		iIter(Points.begin()),
+
+
+		LTM ( nVar ,  nRegions, TS_ObjFunc.min_bound , TS_ObjFunc.max_bound),
+		//	progressive_HISTORY("prog_HISTORY", nVar, nObj, 2), //first item is the iteration_number and second is the order of evaluation
+		//	progressive_MTM("prog_HISTORY", nVar, nObj, 2),
+		//the values are set to default, as if the optimisation starts from scratch
+		iLocal(0),
+		cur_loops(1),
+		previous_cur_loops(0),
+		previous_evaluations(0),
+		nextMoveHookeJeeves(1), //initial value
+		diversification(0),
+		intensification(0),
+		reduction(0)
+//		BP_tracer(deque<  BP_tuple >())
+
+
+{
+
+	cout << "MOTS2, provided by Christos Tsotskas (c.tsotskas@gmail.com), started " << __DATE__ << " at " << __TIME__;
+		ID();//this is needed only for random initialisation
+
+
+
+
+	////int succesfull_copy=0; //gia checkpoints
+
+	char const *STM_checkpoint="./memories/STM.txt";
+	char const *MTM_checkpoint="./memories/MTM.txt";
+	char const *LTM_checkpoint="./memories/LTM.txt";
+	char const *IM_checkpoint="./memories/IM.txt";
+	char const *HISTORY_checkpoint="./memories/HISTORY.txt";
+	char const *checkpoint_path="./monitor_data/chekpoint.out";
+
+	cout << endl << "Initialising TS" << endl;
+
+
+	Point2 datumPnt(nVar,0.0);
+	ObjFunction2 currentObjFunc(nObj,0.0);
+
+	//read configuration file
+	read_objectives_file("reference_point.txt", "reference point", reference_point);
+	read_design_vector_file( starting_point, "datum_design_vector.txt", "datum design", datumPnt, TS_ObjFunc.min_bound, TS_ObjFunc.max_bound);
+	cout << endl << endl << "Initial Solution is "  << endl << datumPnt << endl;
+
+	cout << "SS="<< SS << endl;
+	if(SS==0)
+		readInputFiles("start_step.txt", CurrentStep);
+
+
+	//checkpoint!
+	//	if ( FileExists(MTM_checkpoint) && FileExists(MTM_checkpoint) && FileExists(LTM_checkpoint) && FileExists(IM_checkpoint) && FileExists(HISTORY_checkpoint)){
+	if( restart_flag==1){
+		if(	(FileExists(STM_checkpoint) &&
+				FileExists(MTM_checkpoint) &&
+				FileExists(LTM_checkpoint) &&
+				FileExists(IM_checkpoint) &&
+				FileExists(HISTORY_checkpoint) &&
+				FileExists(checkpoint_path))!=1 ){
+
+			cout << "cannot perform restart, some files are missing" << endl;
+			exit ( -5000);
+		}
+
+		//since every method will read as a checkpoint AT least one entry, the overall
+		//product will be a large positive number. otherwise it will be zero. This is
+		//used later on.
+		cout << " checkpoint found!" <<endl;
+
+
+		STM.load_stm_container(STM_checkpoint);
+		MTM.load_container(MTM_checkpoint);
+		IM.load_container(IM_checkpoint);
+		HISTORY.load_container(HISTORY_checkpoint);
+		LTM.load_ltm_container(LTM_checkpoint);
+
+		cout << "checkpoints are loaded" << endl;
+
+		ifstream checkpoint_file(checkpoint_path);
+
+
+		checkpoint_file >> previous_cur_loops;
+		cout << "previous loop " << previous_cur_loops << endl;
+
+		cur_loops=previous_cur_loops;
+		--previous_cur_loops;
+		for(unsigned int v=0; v<nVar;++v)
+			checkpoint_file>>datumPnt[v];
+
+
+		checkpoint_file>>diversification ;
+		checkpoint_file>> intensification ;
+		checkpoint_file>> reduction;
+		checkpoint_file>>iLocal;
+
+
+		for(unsigned int v=0; v<nVar;++v)
+			checkpoint_file>>InitialStep[v];
+
+		checkpoint_file.close();
+
+		CurrentStep=InitialStep;
+
+		cout << " restart resumes from diversification "<< diversification << ", intensification " << intensification << ", reduction " << reduction  << ", iLocal " << iLocal<< endl;
+		cout << "\t and step size: "<< InitialStep << endl;
+
+		previous_evaluations= HISTORY.count_evaluations(TS_ObjFunc.failedObjectiveFunctionVector);
+		//datumPnt=MTM.selectRandom(); //random initialise , DATUM could be used instead
+		//cout << "random point from MTM is " << endl << datumPnt << "\t ===> ";
+		cout << "previous base point is " << endl << datumPnt << "\t ===> ";
+
+		currentObjFunc=HISTORY[datumPnt];
+		cout << currentObjFunc << endl;
+	}
+	else{
+		iLocal=0;
+		diversification=0;
+		intensification=0;
+		reduction=0;
+
+		cur_loops=1;
+		previous_cur_loops=0;
+		previous_evaluations=0;
+
+		for (unsigned int i=0; i<InitialStep.size(); ++i)
+			InitialStep[i]=TS_ObjFunc.range[i]*CurrentStep[i];
+
+		cout << "initial step" << endl << "\t" << InitialStep << endl;
+
+		cout << " NO checkpoint files found" <<endl;
+		cout << "starting a new search" << endl;
+		currentObjFunc = TS_ObjFunc.calculateObjFun(datumPnt); // respective obj function
+		MTM.insert(entry( datumPnt , currentObjFunc ));
+		IM.insert(entry( datumPnt , currentObjFunc ));
+		HISTORY.insert(entry( datumPnt , currentObjFunc ) );
+		// TODO: to be improved ( 1 sunarthsh pou 8a kanei evaluate points) anti gia to following set entolwn
+	}
+
+	cout << "initial point & Obj" <<endl;
+	cout<< "initial point" << datumPnt  << " maps to " << currentObjFunc << endl;
+
+	Push_Base_Point(datumPnt, "initial" );
+};
+
+
+//Algorithm 4a
+
+
+//Algorithm 4
+
+
+
+
+
+//Algorithm 6a
+void TabuSearch::numerical_check(Point2 const input, string const location){
+	for (unsigned int v=0; v<nVar; ++v)
+		if( 0<input[v] and input[v]<epsilon  ){
+			cout << "numerical error @"<< location << " (" << v << "th element) " << input[v] << endl;
+			exit(-50);
+		}
+}
+
+
+
+
+ObjFunction2 TabuSearch::evaluate_point(Point2 &P1){
+	ObjFunction2 currentObjective;
+
+	/////CA correct_accuracy(P1);
+
+	if (HISTORY.find(P1)==HISTORY.end()){
+#ifdef DEBUG
+		cout << "\t point evaluated" << endl;
+#endif
+		currentObjective=TS_ObjFunc.calculateObjFun(P1);
+		HISTORY.insert(entry( P1 , currentObjective ) );
+	}else{
+#ifdef DEBUG
+		cout << "\t point recalled from memory" << endl;
+#endif
+		currentObjective=HISTORY[P1];
+	}
+	return currentObjective;
+
+}
+
+
+void TabuSearch::evaluate_point_parallel(Container2 &C1){
+	std::map<Point2,ObjFunction2> toBeEvaluated;
+
+	//check which points already exist into history, and which should be evaluated
+	for(Container2::iterator it=C1.begin(); it!=C1.end(); ++it){
+		if (HISTORY.find(it->first)==HISTORY.end()){
+			toBeEvaluated.insert(entry(it->first,it->second));
+		}else{
+			it->second=HISTORY[it->first];
+		}
+	}
+	if(toBeEvaluated.size()>0){
+		//send the rest of points for evaluation
+		TS_ObjFunc.calculateObjFun_parallel(toBeEvaluated);
+		//fill in the the C1
+		for(std::map<Point2,ObjFunction2>::iterator it=toBeEvaluated.begin(); it!=toBeEvaluated.end(); ++it){
+			C1[it->first]=it->second;
+			HISTORY.insert(entry( it->first,it->second ) );
+		}
+	}
+}
+
+
+Point2  TabuSearch::increase(Point2 const &input, unsigned int const index){
+	Point2 output(input);
+
+	double temp_step=InitialStep[index]* pow(SSRF,reduction);
+	double temp_value=input[index];
+
+	double temp_result= temp_value +  temp_step ;
+#ifdef DEBUG_STEP
+	cout << "for " << index << "th variable, the increase step is " << temp_step << endl;
+#endif
+
+
+	//round
+	//temp_result=round(temp_result);
+	//calculate the absolute error
+	if( abs(temp_result)<  EPSILON ){
+#ifdef DEBUG_STEP
+		cout << " accuracy fixed ! " << endl;
+#endif
+		temp_result=0.0;
+	}
+
+	output[index]= temp_result  ;
+#ifdef DEBUG_STEP
+	cout << "\tso " << input << " equals" << output << endl;
+#endif
+	return output;
+}
+
+Point2  TabuSearch::decrease(Point2 const &input, unsigned int const index){
+	Point2 output(input);
+
+	double temp_step=InitialStep[index]* pow(SSRF,reduction);
+	double temp_value=input[index];
+
+	double temp_result= temp_value -  temp_step ;
+#ifdef DEBUG_STEP
+	cout << "for" << index << "th variable, the decrease step is " << temp_step << endl;
+#endif
+
+	//round
+	//temp_result=round(temp_result);
+	//calculate the absolute error
+	if( abs(temp_result)<  EPSILON ){
+#ifdef DEBUG_STEP
+		cout << " accuracy fixed ! " << endl;
+#endif
+		temp_result=0.0;
+	}
+
+	output[index]= temp_result  ;
+#ifdef DEBUG_STEP
+	cout << "\tso " << input << " equals" << output << endl;
+#endif
+	return output;
+}
+//Algorithm 6
+
+//Algorithm 7
+int TabuSearch::PatternMove(){
+	//STM_Container2::iterator tempback;
+	Point2 lastPoint, lastMove, newPoint;
+	Point2 currentPoint;
+	ObjFunction2 tempObjFunc;
+	ObjFunction2 currentObjFunc;
+
+#ifdef DEBUG
+	cout << "PatternMove " << endl;
+#endif
+
+	//cout << "current" << endl;
+	//cout<< *iIter << endl;
+	currentPoint= *iIter; //currentPoint=points(iIter) ;
+	currentObjFunc=HISTORY[currentPoint];
+	++iIter;
+	/*
+	 * shifts the pointer, so that it points the next "second" point on the deque.
+	 * This happens in order to "produce" gradient.
+	 * In essence, I recall the "second" item and the I return the pointer back to the top of the deque
+	 */
+	lastPoint= *iIter; //lastPoint=points(iIter-1) ;
+	--iIter; //return it to its previous position
+
+	lastMove=currentPoint-lastPoint;
+	/////CA correct_accuracy(lastMove);
+
+	newPoint=currentPoint+lastMove;
+	/////CA correct_accuracy(newPoint);
+
+#ifdef DEBUG
+	// debugging output
+
+
+	cout << "current point" << endl << currentPoint << endl;
+	cout << "last point" << endl << lastPoint << endl;
+	cout << "last move" << endl << lastMove << endl;
+	cout << "new point" << endl << newPoint << endl;
+#endif
+
+
+
+
+	if(!TS_ObjFunc.isValid(newPoint) ){
+#ifdef DEBUG
+		cout << "PatternMove EXIT-0 invalid design" << endl;
+#endif
+		return 0;
+	}
+
+	tempObjFunc=evaluate_point(newPoint);
+
+
+	////	if ( ( dominates2(  entry ( newPoint, tempObjFunc ) , entry ( currentPoint, currentObjFunc)) == 1) and TS_ObjFunc.constraints(newPoint) ){
+
+	if ( MTM.addIfNotDominated(  newPoint, tempObjFunc )==1 ){
+		IM.insert(entry ( newPoint, tempObjFunc ));
+
+		/*
+		 * ATTENTION!!!
+		 * the steps in pseudocode differ, I reorder these steps logically so that the same functionality is achieved
+		 */
+		++iLocal;
+
+#ifdef DEBUG
+		cout << "\tPmove" << endl << newPoint << endl;
+#endif
+
+		/*Points.push_front(newPoint); //a
+iIter=Points.begin();*/
+
+
+		Push_Base_Point(newPoint, "PatMove");
+
+#ifdef DEBUG
+		cout << "PatternMove EXIT-1" << endl;
+#endif
+		return 1;
+	}else{
+#ifdef DEBUG
+		cout << "PatternMove EXIT-0 did not found non-dominated design" << endl;
+#endif
+		return 0;
+	}
+
+}
+
+
+void TabuSearch::check_memories(){
+#ifdef DEBUG
+	cout << " check_memories START" << endl;
+#endif
+	ofstream mem_status;
+	mem_status.open ("./monitor_data/memory_status.txt",  ios::out  );
+
+
+#ifdef DEBUG
+	cout << "\tLTM";
+#endif
+	mem_status << " LTM regions" << endl;
+	mem_status<< " region 0: " << LTM.Region[0].size() << " size "<< endl;
+
+	for (unsigned int i=1 ; i < nRegions ; ++i)
+		mem_status << " region "<< i << ": " << LTM.Region[i].size()<< " size " << endl;
+
+
+#ifdef DEBUG
+	cout << "\tIM";
+#endif
+	mem_status << " IM " << IM.check_memory() << "empty variables and objectives "<< endl;
+
+#ifdef DEBUG
+	cout << "\tMTM";
+#endif
+	mem_status  << " MTM "<< MTM.check_memory()<< "empty variables and objectives "<< endl;
+
+#ifdef DEBUG
+	cout << "\tHISTORY";
+#endif
+	mem_status << " HISTORY "<< HISTORY.check_memory()<< "empty variables and objectives "<< endl;
+
+	mem_status.close();
+#ifdef DEBUG
+	cout << "check_memories END" << endl;
+#endif
+}
+
+
+//Algorithm 8
+void TabuSearch::UpdateMemories(){
+	Point2 currentPoint;
+	ObjFunction2 currentObjFunc;
+	int success=0;
+	//cout << "UpdateMemories " << endl;
+
+#ifdef DEBUG
+	cout << "UpdateMemories_START" << endl;
+
+
+	cout << "\tmemories' sizes:" << endl;
+	cout << "\tBasePoints" << Points.size() << endl;
+	cout << "\tSTM " << STM.size() << endl;
+	cout << "\tMTM " << MTM.size() << endl;
+	cout << "\tIM " << IM.size() << endl;
+	cout << "\tLTM " << LTM.getSize() << endl;
+	cout << "\tHISTORY " << HISTORY.size() << endl<< endl;
+
+	cout << "\tiLocal" << iLocal << endl;
+#endif
+
+	currentPoint= *iIter;//currentPoint = Points.
+
+#ifdef DEBUG
+	if ((*iIter).empty() )
+		cout << "empty vector!!!!!!!!!!!!!!!" << endl;
+	cout << "\t currentPoint" << currentPoint << endl;
+#endif
+
+
+
+
+
+	/*if (HISTORY.find(currentPoint)==HISTORY.end()){ //v1
+currentObjFunc=TS_ObjFunc.calculateObjFun(currentPoint);
+HISTORY.insert(entry( currentPoint , currentObjFunc ) );
+}else
+currentObjFunc=HISTORY[currentPoint];*/
+
+	//currentObjFunc=evaluate_point(currentPoint);
+
+	if (HISTORY.find(currentPoint)==HISTORY.end()){ //v2
+		cout << " EMPTY_POINT in HISTORY (@ Update Mem)!" << endl;
+		exit(-60);
+	}
+
+
+
+	//currentObjFunc=HISTORY[currentPoint];
+
+	currentObjFunc=evaluate_point(currentPoint); //v3
+
+
+	STM.import(currentPoint);
+	//	LTM.specialadd(currentPoint);
+
+
+	success=MTM.addIfNotDominated(  currentPoint , currentObjFunc   );
+
+#ifdef DEBUG
+	cout <<"\tUp M, addIfNotDominated =" <<success << endl;
+#endif
+
+	if(success){
+		//todo consider the consequences of adding the following snippet!
+		/*IM.insert( entry( currentPoint , currentObjFunc  ) );
+IM.removeDominatedPoints();
+		 */
+
+		MTM.removeDominatedPoints();
+		iLocal=0;
+	}
+
+	LTM.insert(currentPoint);
+
+	check_memories();
+
+#ifdef DEBUG
+
+	cout << "\tiLocal" << iLocal << endl;
+	cout << "UpdateMemories EXIT " << endl;
+#endif
+
+}
+
+
+//Algorithm 9b
+
+
+
+
+
+void TabuSearch::setStoppingCriteria(){
+
+}
+
+
+
+int TabuSearch::stoppingCriteriaNotMet(const unsigned int &n_of_loops,const unsigned int &n_of_evaluations, const unsigned int &n_of_consecutive_improvements){
+
+	//#loops
+	//#evaluations
+	//# consecutive improvements
+
+	// LL - loop limit
+	// EL - evaluations limit
+	// IL - improvements limit
+	//the limits are set on the conf file
+
+
+	//cout << "n_of_loops=" << n_of_loops << " n_of_consecutive_improvements=" << n_of_consecutive_improvements << " n_of_evaluations"  << n_of_evaluations << endl;
+
+	//stops after NEVALS evaluations of ObjFunction, use with TS_ObjFunc.n_of_successful_calculations
+	if( ( (n_of_loops != LL )  && (n_of_consecutive_improvements!= IL)) && (n_of_evaluations < EL || n_of_evaluations==0) ){
+		//cout << "sunexizw" << endl;
+		return 1; //keep iterating
+	}
+	else{
+		//cout << "bgainw" << endl;
+		return 0; //stop
+	}
+}
+
+
+void TabuSearch::search2(){
+
+	cout << "prin search" << endl;
+	time_t start,end;
+	time (&start);
+
+
+
+
+
+
+
+	iLocal=0;
+	//iIter=0; // on the TS constructor
+	//unsigned int cur_loops=1;
+	unsigned int improvement=1;
+	int success=0;
+
+	double current_quality_indicator=0;
+	double previous_quality_indicator=0;
+
+	Point2 newPoint;
+
+	//for restart
+	ofstream checkpoint_file;
+
+#ifdef FULL_LOG
+
+
+	ofstream diversify_file;
+	ofstream evals_file;
+	ofstream hypervolume_file;
+	ofstream i_local_file;
+	ofstream im_size_file;
+	ofstream intensify_file;
+	ofstream step_size_file;
+	ofstream reduction_file;
+	ofstream basePoint_file;
+	ofstream update_memories_file;
+
+	if(restart_flag==1){
+
+		diversify_file.open ("./monitor_data/diversify.out",  ios::app );
+		evals_file.open ("./monitor_data/evals.out", ios::app);
+		hypervolume_file.open ("./monitor_data/hypervolume.out" , ios::app);
+		i_local_file.open ("./monitor_data/i_local.out",  ios::app);
+		im_size_file.open ("./monitor_data/im_size.out", ios::app);
+		intensify_file.open ("./monitor_data/intensify.out", ios::app );
+		step_size_file.open ("./monitor_data/step_size.out",  ios::app);
+		reduction_file.open ("./monitor_data/reduce.out",  ios::app);
+		basePoint_file.open ("./monitor_data/basePoint.out",  ios::app );
+		update_memories_file.open ("./monitor_data/update_memories.out",  ios::app );
+	}else{
+		diversify_file.open ("./monitor_data/diversify.out",   ios::out );
+		evals_file.open ("./monitor_data/evals.out",  ios::out);
+		hypervolume_file.open ("./monitor_data/hypervolume.out" ,  ios::out);
+		i_local_file.open ("./monitor_data/i_local.out",   ios::out);
+		im_size_file.open ("./monitor_data/im_size.out",  ios::out);
+		intensify_file.open ("./monitor_data/intensify.out",  ios::out );
+		step_size_file.open ("./monitor_data/step_size.out",   ios::out);
+		reduction_file.open ("./monitor_data/reduce.out",   ios::out);
+		basePoint_file.open ("./monitor_data/basePoint.out",   ios::out );
+		update_memories_file.open ("./monitor_data/update_memories.out",   ios::out );
+	}
+
+	//	diversify_file << "#iteration" <<"     "<< "diversification" <<endl;
+	//	evals_file << "#cur_loops" <<"     "<< "evaluations_counter" <<endl;
+	//
+	//	i_local_file << "#cur_loops" <<"     "<< "iLocal" <<endl;
+	//	im_size_file << "#cur_loops" <<"     "<< "IM.size()" <<endl;
+	//	intensify_file << "#cur_loops" <<"     "<< "intensification" <<endl;
+	//	step_size_file << "#cur_loops" <<"     "<< "step" <<endl;
+	//	reduction_file << "#cur_loops" <<"     "<< "reduction" <<endl;
+	//	basePoint_file  << "#cur_loops" <<"     "<< "basePoint" <<endl;
+	//	update_memories_file << "#cur_loops" <<"     "<< "update_memories_counter" <<endl;
+#endif
+
+#ifdef QUICK_LOG
+	ofstream quick_file;
+	quick_file.open ("./monitor_data/quick.out", ios::out );
+	quick_file<< "#N\tEVALS{+}\tVIOL\tE/I\tHV\tMTM\tiLOC\tIM\tDIVFS\tINTFS\tRDC"<<endl;
+
+#endif
+
+	//	previous_cur_loops=0;
+	//			previous_evaluations=0;
+	//int temp_loop=cur_loops-previous_cur_loops;
+	//int temp_evaluations=HISTORY.count_evaluations(TS_ObjFunc.failedObjectiveFunctionVector)-previous_evaluations;
+
+	while (stoppingCriteriaNotMet(cur_loops-previous_cur_loops, HISTORY.count_evaluations(TS_ObjFunc.failedObjectiveFunctionVector)-previous_evaluations, improvement)){ // 0 - exit
+
+#ifdef FULL_LOG
+		diversify_file << cur_loops <<"     "<< diversification <<endl;
+		evals_file << cur_loops <<"     "<< TS_ObjFunc.n_of_successful_calculations+TS_ObjFunc.violations  <<endl;
+		//hypervolume_file << cur_loops <<"     "<< diversification <<endl;
+		i_local_file << cur_loops <<"     "<< iLocal <<endl;
+		im_size_file << cur_loops <<"     "<< IM.size() <<endl;
+		intensify_file << cur_loops <<"     "<< intensification <<endl;
+		step_size_file << cur_loops <<"     "<< CurrentStep <<endl;
+		reduction_file << cur_loops <<"     "<< reduction <<endl;
+		basePoint_file << cur_loops <<"     "<< *iIter <<endl; //that's the top point in the POINTS container
+#endif
+
+#ifdef QUICK_LOG
+		quick_file<< cur_loops << "\t" << TS_ObjFunc.n_of_successful_calculations+TS_ObjFunc.violations << "{" << TS_ObjFunc.n_of_successful_calculations <<"}" << "\t(" << TS_ObjFunc.violations << ")"<< "\t" << TS_ObjFunc.n_of_successful_calculations / cur_loops << "\t"<< current_quality_indicator <<"(" << improvement <<")" << "\t" << MTM.size() << "\t" << iLocal <<"\t"<< IM.size() <<"\t"<< diversification  <<"\t"<< intensification <<"\t" << reduction << endl;
+#endif
+
+		cout << "base point on " << cur_loops << "th iteration is" << *iIter << " ===>" << HISTORY[*iIter] << endl;
+		cout << "\t with current_step: " << CurrentStep << endl;
+		//update checkpoint file
+		checkpoint_file.open("./monitor_data/chekpoint.out", ios::out);
+		checkpoint_file  << cur_loops <<"     " << *iIter << " "<< diversification <<" "<< intensification <<" "<< reduction << " " << iLocal  << " " << CurrentStep << endl;
+		checkpoint_file.close();
+
+		numerical_check(*iIter, "main_loop");
+
+		//HookeJeevesMove() ;
+
+		if (nextMoveHookeJeeves){
+#ifdef HJ_SERIAL
+			HookeJeevesMove(cur_loops) ;
+#endif//HJ_SERIAL
+#ifdef HJ_PARALLEL
+			HookeJeevesMove_parallel(cur_loops) ;
+#endif//HJ_PARALLEL
+		}else {
+			success = PatternMove() ;
+			if (success)
+				nextMoveHookeJeeves = 1 ;
+			else{
+#ifdef HJ_SERIAL
+				HookeJeevesMove(cur_loops) ;
+#endif//HJ_SERIAL
+#ifdef HJ_PARALLEL
+				HookeJeevesMove_parallel(cur_loops) ;
+#endif//HJ_PARALLEL
+			}
+		}
+
+		line18:
+#ifdef FULL_LOG
+		diversify_file << cur_loops <<"     "<< diversification <<endl;
+		evals_file << cur_loops <<"     "<< TS_ObjFunc.n_of_successful_calculations << "     " << TS_ObjFunc.violations << endl;
+		//hypervolume_file << cur_loops <<"     "<< diversification <<endl;
+		i_local_file << cur_loops <<"     "<< iLocal <<endl;
+		im_size_file << cur_loops <<"     "<< IM.size() <<endl;
+		intensify_file << cur_loops <<"     "<< intensification <<endl;
+		step_size_file << cur_loops <<"     "<< CurrentStep <<endl;
+		reduction_file << cur_loops <<"     "<< reduction <<endl;
+#endif
+
+#ifdef QUICK_LOG
+		quick_file<< cur_loops << "\t" << TS_ObjFunc.n_of_successful_calculations+TS_ObjFunc.violations << "{" << TS_ObjFunc.n_of_successful_calculations <<"}" << "\t(" << TS_ObjFunc.violations << ")"<< "\t" << TS_ObjFunc.n_of_successful_calculations / cur_loops << "\t"<< current_quality_indicator <<"(" << improvement <<")" << "\t\t" << iLocal <<"\t"<< IM.size() <<"\t"<< diversification  <<"\t"<< intensification <<"\t" << reduction << endl;
+#endif
+
+
+		UpdateMemories(); // <<<----- 18
+
+		if (iLocal==diversify) {
+			newPoint=DiversifyMove2() ;
+
+			/*Points.push_front(newPoint);//a
+iIter=Points.begin();*/
+
+
+			Push_Base_Point(newPoint, "DivMove");
+			goto line18 ;
+
+		}else if (iLocal==intensify) {
+			newPoint=IntensifyMove2() ;
+
+			/*Points.push_front(newPoint);//a
+iIter=Points.begin();*/
+			Push_Base_Point(newPoint, "IntMove");
+			goto line18 ;
+		}else if (iLocal==reduce) {
+			newPoint=ReduceMove2() ;
+
+			/*Points.push_front(newPoint); //a
+iIter=Points.begin();*/
+			Push_Base_Point(newPoint, "RedMove");
+			goto line18 ;
+		}else if (  (MTM.activate_kick("./memories/MTMfrequencies.txt", maximum_duplicates, TS_ObjFunc.failedObjectiveFunctionVector) and improvement>maximum_improvements*0.1) or improvement>maximum_improvements ){
+			newPoint=ReduceMove2() ;
+			Push_Base_Point(newPoint, "kickMove");
+
+			improvement=1;
+			cout << " KICK! " << endl;
+			goto line18 ;
+		}
+
+		if(cur_loops % save_step == 0){
+
+			displayParetoFront();
+			save_memories(cur_loops);
+#ifdef main_report
+			MTM.report_optima_plot("optima_plot.txt");
+			MTM.report_optima_current("optima_current.txt");
+			HISTORY.report_optima_plot("tabu_plot.txt");
+#endif
+		}
+
+
+		current_quality_indicator=MTM.calculate_quality_indicator( reference_point );
+		if(current_quality_indicator==previous_quality_indicator)
+			++improvement;
+		else{
+			previous_quality_indicator=current_quality_indicator;
+			improvement=1;
+		}
+
+		++cur_loops;// diko mou
+	}
+
+
+#ifdef FULL_LOG
+	diversify_file.close();
+	evals_file.close();
+	hypervolume_file.close();
+	i_local_file.close();
+	im_size_file.close();
+	intensify_file.close();
+	step_size_file.close();
+	basePoint_file.close();
+	update_memories_file.close();
+#endif
+
+#ifdef QUICK_LOG
+	quick_file.close();
+#endif
+
+
+
+
+	save_memories(cur_loops);
+
+	displayParetoFront();
+	time (&end);
+	double dif = difftime (end,start);
+
+	cout << "end in " << dif<< "seconds" << endl;
+}
+
+
+/*current_quality_indicator=calculate_hypervolume(MTM, TS_TabuList.reference_point);
+if(current_quality_indicator==previous_quality_indicator)
+++improvement;
+else{
+previous_quality_indicator=current_quality_indicator;
+improvement=0;
+}*/
+
+
+
+void TabuSearch::displayParetoFront(){
+	cout << "Pareto Front:" << endl;
+	cout << "MTM size=" << MTM.size() << endl;
+	ofstream myfile;
+	myfile.open ("TS.txt",  ios::out );
+
+
+	for(Container2::iterator it=MTM.begin() ; it != MTM.end() ; ++it){
+		/*for(unsigned int i=0; i< nVar ; i++)
+cout << it->first[i] << ", ";
+cout << endl;*/
+
+		//for(unsigned int i=0; i<it->second.size() ; ++i)
+		//	myfile << it->second[i] << "\t" ;
+		for( unsigned int i=0 ; i< it->second.size() ; ++i)
+			myfile << it->second[i] << "\t";
+
+		myfile << endl; //save only the objective values (NOT THE DESIGN VECTOR)
+
+
+
+	}
+	//myfile << "Writing this to a file.\n";
+	myfile.close();
+}
+
+
+std::string TabuSearch::give_the_move(const Point2 &P){
+	for (deque<BP_tuple>::iterator it=BP_tracer.begin(); it!=BP_tracer.end() ; ++it)
+		if( (*it).first == P )
+			return (*it).second ;
+
+	return "ERROR_MOVE";
+}
+
+
+void TabuSearch::save_memories(int loop){
+
+#ifdef DEBUG
+	cout << "save_memories START" << endl;
+#endif
+
+
+
+	//const int accuracy=8;
+	//cout.precision(accuracy);
+
+	cout << "BaseP size=" << Points.size() <<" STM size=" << STM.size() << " MTM size=" << MTM.size()	<< " LTM size=" << LTM.getSize() << " IM size=" << IM.size() <<" HISTORY size=" << HISTORY.size() << endl;
+	//---------- BaseP memory save -------------------
+	ofstream BPfile;
+	Point2 tempv1;
+	BPfile.open ("./memories/BASE.txt",  ios::out  );
+	//BPfile << "duplicates = " << Points.checkduplicate() << "\tsize = " << Points.size() << endl;
+	for(deque<Point2>::const_iterator it=Points.begin() ; it != Points.end() ; ++it){
+		copy_contents(tempv1, *it);
+		BPfile << loop-- << " "<< *it << "\t" << HISTORY[*it] << " reg=" << LTM.getRespetiveRegion(tempv1) << " move=" << give_the_move(*it) << endl;
+	}
+
+	BPfile.close();
+
+	const int evaluations_counter_so_far=HISTORY.size();
+
+#ifdef DEBUG
+	cout << "Base Points saved!" << endl;
+#endif
+
+	//---------- STM memory save -------------------
+	STM.save_stm_container("./memories/STM", evaluations_counter_so_far);
+#ifdef DEBUG
+	cout << "STM saved!" << endl;
+#endif
+
+	//---------- MTM memory save -------------------
+
+	MTM.save_container_snapshot("./memories/MTM", evaluations_counter_so_far);
+#ifdef DEBUG
+	cout << "MTM saved!" << endl;
+#endif
+
+	//---------- LTM memory save -------------------
+	LTM.save_ltm_container("./memories/LTM", evaluations_counter_so_far);
+#ifdef DEBUG
+	cout << "LTM saved!" << endl;
+#endif
+
+	//---------- IM memory save -------------------
+	IM.save_container_snapshot("./memories/IM", evaluations_counter_so_far);
+#ifdef DEBUG
+	cout << "IM saved!" << endl;
+#endif
+
+	//---------- HISTORY memory save -------------------
+	HISTORY.save_container_snapshot("./memories/HISTORY", evaluations_counter_so_far);
+#ifdef DEBUG
+	cout << "HISTORY saved!" << endl;
+#endif
+
+	cout << "Memories Saved!" << endl;
+#ifdef DEBUG
+	cout << "save_memories END" << endl;
+#endif
+}
+
+
+
+
+void TabuSearch::displayDeque(  deque<Point2> D){
+	cout << "-=Deque Start=-" << endl;
+
+	int i=1;
+	for ( deque<Point2>::iterator it1=D.begin() ; it1!=D.end() ; ++it1 ){
+		cout << i <<". "<< *it1 << endl;
+		++i;
+	}
+	cout << "-=Deque end=-" << endl;
+}
+
+
+
+
+
+
+void TabuSearch::HookeJeevesMove(unsigned int loop){ // al6
+	unsigned int i; //for counter
+	Container2::iterator it;
+
+	//	unsigned int domination_counter=0;
+	int remaining_sample_sets;
+	//	int random_select=0;
+
+	//if no points dominate the current point on the first random selection
+	temp_Container2 bestPoints;// = new temp_Container; // for H & J move
+
+	//temp_Container *remainingPoints = new temp_Container; //to reduce many evaluations
+	Container2 temp_sampled(nVar,nObj,"HJ1"); // for H & J move, MOTS "strategy"
+
+	Container2 temp_sampled_dominant(nVar,nObj,"HJ2"); // = new Container;
+	Container2 temp_sampled_dominated(nVar,nObj,"HJ3");// = new Container;
+	Container2 C1(nVar,nObj,"HJ4");
+	Container2 buffer_container(nVar,nObj,"HJ5");
+
+	Point2 newPoint;
+	Point2 tempPoint;
+	Point2 nextPoint;
+	Point2 currentPoint;
+	ObjFunction2 tempObjFunc;
+	ObjFunction2 currentObjFunc;
+	Point2 nullVector;
+
+	for(unsigned int k=0; k<nullVector.size(); ++k)
+		nullVector[k]=0;
+
+	//for external use! START
+
+
+	Point2 currentObjFun;
+#ifdef DEBUG
+	cout << "HookeJeevesMove START" << endl;
+#endif
+	currentPoint= *iIter; //currentPoint = points(iIter) ;
+	currentObjFunc= HISTORY[currentPoint];
+
+
+#ifdef DEBUG
+	cout << "\tcur point" << endl << currentPoint <<endl;
+	cout << "\tcurrent steps" << endl << CurrentStep << endl;
+
+	cout << "\twithin tabu" << endl;
+	STM.showTabu();
+
+	cout << "\tupper bound " << TS_ObjFunc.max_bound << endl;
+	cout << "\tlower bound " << TS_ObjFunc.min_bound << endl;
+
+#endif
+
+
+	bestPoints.clear();
+
+
+	/*
+//generate local points to be evaluated
+for ( i=0 ; i < nVar ; ++i) { //each designVariable
+//for (Container::iterator it=bestPoints.begin() ; it != bestPoints.end() ; it++) { //each designVariable
+
+//newPoint = increase (currentPoint , getStepSize3(i) ); //  = currentPoint + stepSizes(designVariable) ; //v1
+//newPoint=increase2(currentPoint,i); //v2
+
+//newPoint=currentPoint;//v3
+//newPoint[i]+=CurrentStep[i];//v3
+
+
+initialise_vector(nullVector, 0); //v4
+nullVector[i]=CurrentStep[i]; //v4
+if( abs(nullVector[i])<epsilon )
+nullVector[i]=0.0;
+newPoint=currentPoint + nullVector; //v4
+//correct_accuracy(newPoint);//HJ
+#ifdef DEBUG
+cout  <<  "\tduring perturbation(+) " << newPoint << " was created! " << endl;
+cout << "\tis tabu" << STM.isTabu(newPoint) << " and valid" << TS_ObjFunc.isValid(newPoint) << endl;
+#endif
+if ( !STM.isTabu(newPoint) &&  TS_ObjFunc.isValid(newPoint)  ){ // isNotTabu(newPoint) and isNotInvalid (newPoint)
+//cout << "tabu and validity check pass" << endl;
+bestPoints.insert(newPoint);
+#ifdef DEBUG
+cout << "\tPoints inserted!" << endl;
+#endif
+}
+
+//newPoint = decrease (currentPoint , getStepSize3(i) ); //  = currentPoint - stepSizes(designVariable) ; //v1
+//newPoint=decrease2(currentPoint,i); //v2
+//newPoint[i]-=2*CurrentStep[i];//v3
+
+
+initialise_vector(nullVector, 0); //v4
+nullVector[i]=CurrentStep[i]; //v4
+if( abs(nullVector[i])<epsilon )
+nullVector[i]=0.0;
+newPoint=currentPoint-nullVector; //v4
+//correct_accuracy(newPoint);//HJ
+
+#ifdef DEBUG
+cout  << "\tduring perturbation(-) " << newPoint << " was created! " << endl;
+cout << "\tis tabu" << STM.isTabu(newPoint) << " and valid" << TS_ObjFunc.isValid(newPoint) << endl;
+#endif
+if ( !STM.isTabu(newPoint) && TS_ObjFunc.isValid(newPoint) ){ // isNotTabu(newPoint) and isNotInvalid (newPoint)
+//cout << "tabu and validity check pass" << endl;
+bestPoints.insert(newPoint);
+#ifdef DEBUG
+cout << "\tPoints inserted!" << endl;
+#endif
+}
+}
+	 */
+
+	//////////////////////////////////////////////////////////////
+
+	//generate local points to be evaluated2!
+	Point2 pointBeforeStepping  = currentPoint;
+
+	Point2 newPoint_incr, newPoint_decr;
+	//	double temp_step;
+	//	double temp_value;
+	initialise_vector(newPoint_decr, 0);
+	initialise_vector(newPoint_incr, 0);
+	newPoint_decr=currentPoint;
+	newPoint_incr=currentPoint;
+
+
+	for ( i=0 ; i < nVar ; ++i) { //each designVariable
+
+
+
+		newPoint_incr=increase(currentPoint,i) ;
+#ifdef DEBUG
+		cout  <<  "\tduring perturbation(+) " << newPoint_incr << " was created! " << endl;
+		cout << "\tis tabu" << STM.isTabu(newPoint_incr) << " and valid" << TS_ObjFunc.isValid(newPoint_incr) << endl;
+#endif
+		if ( !STM.isTabu(newPoint_incr) &&  TS_ObjFunc.isValid(newPoint_incr)  ){ // isNotTabu(newPoint_incr) and isNotInvalid (newPoint_incr)
+			//cout << "tabu and validity check pass" << endl;
+			bestPoints.insert(newPoint_incr);
+#ifdef DEBUG
+			cout << "\tPoints inserted!" << endl;
+#endif
+		}
+
+		newPoint_decr=decrease(currentPoint,i) ;
+		//newPoint_decr[i]=temp_value - temp_step ;
+#ifdef DEBUG
+		cout  << "\tduring perturbation(-) " << newPoint_decr << " was created! " << endl;
+		cout << "\tis tabu" << STM.isTabu(newPoint_decr) << " and valid" << TS_ObjFunc.isValid(newPoint_decr) << endl;
+#endif
+		if ( !STM.isTabu(newPoint_decr) && TS_ObjFunc.isValid(newPoint_decr) ){ // isNotTabu(newPoint) and isNotInvalid (newPoint)
+			//cout << "tabu and validity check pass" << endl;
+			bestPoints.insert(newPoint_decr);
+#ifdef DEBUG
+			cout << "\tPoints inserted!" << endl;
+#endif
+		}
+
+
+	}
+
+
+	remaining_sample_sets=(int)(bestPoints.size()/n_sample);
+	if(bestPoints.size()%n_sample!=0)
+		++remaining_sample_sets;
+
+
+#ifdef DEBUG
+	int total_sets=remaining_sample_sets;
+	cout << "\t<bestPoints><size> contains " << bestPoints.size() <<" candidate points</size>" << endl;
+	cout << "\t<sample_set>which form" <<  remaining_sample_sets << "SAMPLE SETS!</sample_set></bestPoints>" << endl;
+	cout << "IM's size " << IM.size() << endl;
+#endif
+
+
+
+	if(bestPoints.size()==0){
+		if(IM.size()>0){
+			Point2 tempPnt=IM.selectRandom();
+			IM.erase(tempPnt);
+			++remaining_sample_sets;
+			bestPoints.insert(tempPnt);
+#ifdef DEBUG
+			cout << "design:" << tempPnt << " was selected from IM" << endl;
+			cout << "\t<bestPoints><size> contains " << bestPoints.size() <<" candidate points</size>" << endl;
+			cout << "\t<sample_set>which form" <<  remaining_sample_sets << "SAMPLE SETS!</sample_set></bestPoints>" << endl;
+			cout << "IM's size " << IM.size() << endl;
+#endif
+
+		}else{
+			cout << "algorithm trapped, neither good candidate point was generated, nor IM has any candidate point" << endl;
+			save_memories(loop);
+			exit(-3000);
+		}
+	}
+
+
+	////PRIN THN TROPOIOPOHSH
+	/*
+	 * ATTENTION!!!
+	 *
+	 * the steps in pseudocode differ, I reorder these steps logically so that the same functionality is achieved
+	 */
+
+	/*
+// SIMPLEST APPROACH!
+
+Container2 dominant_points, dominated_points;
+
+
+Point2 tmpV;
+temp_sampled.clear();
+
+
+//evaluate every point
+for(temp_Container2::iterator it=bestPoints.begin(); it!=bestPoints.end() ; ++it){
+cout << "bestPoints_it" << *it << endl;
+tmpV=*it;
+tempObjFunc=evaluate_point( tmpV );
+temp_sampled.insert(entry( tmpV, tempObjFunc ));
+}
+
+
+
+//report
+cout << "out of " << bestPoints.size() << " points " << temp_sampled.size() << " evaluated " << endl;
+cout << temp_sampled.check_memory();
+
+//add to memories
+for(Container2::iterator it=temp_sampled.begin() ; it!=temp_sampled.end(); ++it){
+if(MTM.addIfNotDominated( it->first , it->second )==1){
+dominant_points.insert(entry( it->first , it->second ))	;
+}else
+dominated_points.insert(entry( it->first , it->second ))	;
+}
+
+//select the following point
+if( dominant_points.size()!=0 ){
+nextPoint=dominant_points.selectRandom();
+//IM.removeDominatedPoints();
+}
+else{
+nextPoint=dominated_points.selectRandom();
+
+
+}
+	 */
+
+	//00000000000000000000000000000000000000000000000000000000000000000000000000000000
+	//00000000000000000000000000000000000000000000000000000000000000000000000000000000
+	//approach 3_Nov
+
+
+	//random sampling
+	int set_counter=-1;
+	while( bestPoints.size()>0 and remaining_sample_sets>0){
+		++set_counter;
+#ifdef DEBUG
+		cout << "\t set " << set_counter  << " out of" << 	total_sets << endl;
+#endif
+		for(  i=0 ; i<n_sample and 0<bestPoints.size() ; ++i){ //evaluate 6 Points
+#ifdef DEBUG
+			cout << "\t sample "<< i << endl;
+#endif
+			tempPoint=bestPoints.selectRandom();
+			bestPoints.erase(tempPoint);
+			tempObjFunc=evaluate_point(tempPoint);
+			temp_sampled.insert(entry( tempPoint , tempObjFunc ) );
+
+			if(    MTM.addIfNotDominated(     tempPoint , tempObjFunc     )==1  )
+				temp_sampled_dominant.insert( entry (  tempPoint , tempObjFunc  ) );
+			else
+				temp_sampled_dominated.insert( entry (  tempPoint , tempObjFunc  ) );
+		}
+
+#ifdef DEBUG
+		cout << "so far" << temp_sampled_dominant.size() << " dominant were found!" << endl;
+
+		cout << "\tmemories" << endl;
+		cout << "\tdominant ="<< temp_sampled_dominant.size() << endl;
+		cout << "\tdominated =" <<temp_sampled_dominated.size()<<endl;
+#endif
+		switch ( temp_sampled_dominant.size() ) {
+		case 0 : //not dominant points found"
+#ifdef DEBUG
+			cout << "\t<ZERO_dominant> in " << set_counter << "th set, " << temp_sampled_dominant.size() << " points dominate </ZERO_dominant>" <<endl;
+#endif
+			--remaining_sample_sets;
+			break;	//end of case 0
+		case 1 : //the point is selected as basePoint / nextPoint
+			//TODO: merge the following case =1 and case >1
+#ifdef DEBUG
+			cout << "\t<ONE_dominant> in " << set_counter << "th set, " << temp_sampled_dominant.size() << " points dominate </ONE_dominant>" <<endl;
+#endif
+			nextPoint=temp_sampled_dominant.begin()->first;
+			remaining_sample_sets=0;
+			break;	//end of case 1
+		default :
+#ifdef DEBUG
+			cout << "\t<N_dominant> in " << set_counter << "th set, " << temp_sampled_dominant.size() << " points dominate </N_dominant>" <<endl;
+#endif
+			nextPoint=temp_sampled_dominant.selectRandom();
+			remaining_sample_sets=0;
+			break;
+		}// end of switch
+	}
+
+	if( temp_sampled_dominant.size()==0 and temp_sampled_dominated.size()>0 ){
+#ifdef DEBUG
+		cout << "\t<report>sampling ended, dominant points were NOT found </report>" << endl;
+#endif
+		buffer_container=temp_sampled;
+		buffer_container.removeDominatedPoints();
+
+		if(buffer_container.size()!=0){
+#ifdef DEBUG
+			cout << "\t<report>out of the dominated, the dominant was selected </report>" << endl;
+#endif
+			nextPoint=buffer_container.selectRandom();
+		}else{
+#ifdef DEBUG
+			cout << "\t<report>out of the dominated, neither dominates! random among ALL </report>" << endl;
+#endif
+			nextPoint=temp_sampled.selectRandom();
+		}
+	}
+
+
+
+	//---------------------------------------------------------
+	//---------------------------------------------------------
+
+	//TIMOS' TS PROPOSAL
+	/*
+int set_counter=-1;
+while( bestPoints.size()>0 and remaining_sample_sets>0){
+++set_counter;
+#ifdef DEBUG
+cout << "\t set " << set_counter  << " out of" << 	total_sets << endl;
+#endif
+for(  i=0 ; i<n_sample and 0<bestPoints.size() ; ++i){ //evaluate 6 Points
+#ifdef DEBUG
+cout << "\t sample "<< i << endl;
+#endif
+tempPoint=bestPoints.selectRandom();
+bestPoints.erase(tempPoint);
+
+
+
+
+
+tempObjFunc=evaluate_point(tempPoint);
+
+
+if(    MTM.addIfNotDominated(  entry (  tempPoint , tempObjFunc  )   )==1  ){
+IM.insert(   entry (  tempPoint , tempObjFunc  )  );
+temp_sampled_dominant.insert( entry (  tempPoint , tempObjFunc  ) );
+
+}
+else{
+temp_sampled_dominated.insert( entry (  tempPoint , tempObjFunc  ) );
+//(*temp_sampled_dominated)[tempPoint]=currentObjFun;
+}
+temp_sampled.insert(entry( tempPoint , tempObjFunc ) );
+
+}
+
+cout << "so far" << temp_sampled_dominant.size() << " dominant were found!" << endl;
+
+
+
+
+#ifdef DEBUG
+cout << "\tmemories" << endl;
+cout << "\tdominant ="<< temp_sampled_dominant.size() << endl;
+cout << "\tdominated =" <<temp_sampled_dominated.size()<<endl;
+#endif
+switch ( temp_sampled_dominant.size() ) {
+case 0 : //not dominant points found"
+#ifdef DEBUG
+cout << "\t<ZERO_dominant> in " << set_counter << "th set, " << temp_sampled_dominant.size() << " points dominate </ZERO_dominant>" <<endl;
+#endif
+--remaining_sample_sets;
+break;	//end of case 0
+case 1 : //the point is selected as basePoint / nextPoint
+//TODO: merge the following case =1 and case >1
+#ifdef DEBUG
+cout << "\t<ONE_dominant> in " << set_counter << "th set, " << temp_sampled_dominant.size() << " points dominate </ONE_dominant>" <<endl;
+#endif
+nextPoint=temp_sampled_dominant.begin()->first;
+IM.removeDominatedPoints();
+remaining_sample_sets=0;
+break;	//end of case 1
+default :
+#ifdef DEBUG
+cout << "\t<N_dominant> in " << set_counter << "th set, " << temp_sampled_dominant.size() << " points dominate </N_dominant>" <<endl;
+#endif
+nextPoint=temp_sampled_dominant.selectRandom();
+IM.removeDominatedPoints();
+remaining_sample_sets=0;
+break;
+}// end of switch
+
+}
+
+#ifdef DEBUG
+if(temp_sampled_dominant.size()==0){
+cout << "\tsampling failed to find dominant points" << endl;
+cout << "\tcurrently there are:"<< endl;
+cout << "\t" << temp_sampled_dominant.size() << " dominant " << endl;
+cout << "\t" << temp_sampled_dominated.size() << "dominated" << endl;
+cout << "\tof the total of" << temp_sampled.size() << endl;
+}
+#endif
+
+
+
+if( temp_sampled_dominant.size()==0 and temp_sampled_dominated.size()>0 ){
+#ifdef DEBUG
+cout << "\t<report>sampling ended, dominant points were NOT found </report>" << endl;
+#endif
+buffer_container=temp_sampled;
+buffer_container.removeDominatedPoints();
+
+if(buffer_container.size()!=0){
+#ifdef DEBUG
+cout << "\t<report>out of the dominated, the dominant was selected </report>" << endl;
+#endif
+nextPoint=buffer_container.selectRandom();
+buffer_container.erase(nextPoint);
+for(Container::iterator it=buffer_container.begin() ; it!=buffer_container.end(); ++it){
+LTM.specialadd(it->first);
+STM.import(it->first);
+}
+}else{
+#ifdef DEBUG
+cout << "\t<report>out of the dominated, neither dominates! random among ALL </report>" << endl;
+#endif
+nextPoint=temp_sampled.selectRandom();
+temp_sampled.erase(nextPoint);
+for(Container::iterator it=temp_sampled.begin() ; it!=temp_sampled.end(); ++it){
+LTM.specialadd(it->first);
+STM.import(it->first);
+}
+}
+
+
+}
+
+	 */
+	//------------------------------------------------
+	//------------------------------------------------
+
+	//MY ALTERNATIVE TS PROPOSAL
+
+	/*
+for(  i=0 ; i<n_sample && 0<bestPoints.size() ; ++i){ //evaluate 6 Points
+tempPoint=bestPoints.selectRandom();
+bestPoints.erase(tempPoint);
+
+
+if (HISTORY.find(tempPoint)==HISTORY.end()){
+tempObjFunc=TS_ObjFunc.calculateObjFun(tempPoint);
+HISTORY.insert(entry( tempPoint , tempObjFunc ) );
+}else
+tempObjFunc=HISTORY[tempPoint];
+
+
+//separate points
+//	if( dominates2( entry (  tempPoint , tempObjFunc  ) , entry( currentPoint , currentObjFunc)  ) ==1 ){
+
+if(    MTM.addIfNotDominated(  entry (  tempPoint , tempObjFunc  )   )==1  ){
+IM.insert(   entry (  tempPoint , tempObjFunc  )  );
+temp_sampled_dominant.insert( entry (  tempPoint , tempObjFunc  ) );
+++domination_counter;
+}
+else{
+temp_sampled_dominated.insert( entry (  tempPoint , tempObjFunc  ) );
+//(*temp_sampled_dominated)[tempPoint]=currentObjFun;
+}
+temp_sampled.insert(entry( tempPoint , tempObjFunc ) );
+
+}
+
+// SWITCH statement!!!! execution flow is "weird" - MY IMPLEMENTATION!!!
+switch ( domination_counter ) {
+
+case 0 :
+//cout << "nothing found" << endl;
+#ifdef DEBUG
+cout << "\tSECOND CHANCE - start" << endl;
+#endif
+temp_sampled.clear();
+
+for(i=0 ;  i<n_sample && i!=bestPoints.size(); ++i){ //evaluate further 6 new Points
+//cout << i <<"["<<endl; //this section might cause problems between gcc and icc compilations
+tempPoint=bestPoints.selectRandom();
+
+currentObjFun=TS_ObjFunc.calculateObjFun(tempPoint);
+//separate points
+////if( dominates2( entry (  tempPoint , currentObjFun  ) , entry( currentPoint , currentObjFunc)  )  == 1){
+if(    MTM.addIfNotDominated(  entry (  tempPoint , tempObjFunc  )   )==1  ){  //my suggestion!!!!
+IM.insert(   entry (  tempPoint , tempObjFunc  )  );
+temp_sampled_dominant.insert( entry (  tempPoint , currentObjFun  ) );
+//(*temp_sampled_dominant)[tempPoint]=currentObjFun;
+++domination_counter;
+
+}
+else{
+temp_sampled_dominated.insert( entry (  tempPoint , currentObjFun  ) );
+//(*temp_sampled_dominated)[tempPoint]=currentObjFun;
+}
+HISTORY.insert(entry( tempPoint , currentObjFun ) );
+//cout << i <<"]"<<endl;
+}
+
+//internal switch
+switch ( domination_counter ) {
+
+case 0 :
+#ifdef DEBUG
+cout << "\t\tultimate chance" << endl;
+#endif
+nextPoint=bestPoints.selectRandom();
+for(Container::iterator it= temp_sampled_dominated.begin() ; it !=  temp_sampled_dominated.end() ; ++it){
+HISTORY.insert( entry(it->first , it->second ) );
+IM.addIfNotDominated( entry(it->first , it->second ) );
+}
+break;
+//end of internal switch for domination_counter=0
+case 1 :
+nextPoint= temp_sampled_dominant.begin()->first;
+random_select=0;
+//following the selection of base point, the points who live in temp_sample_dominaTED!!!! are due to domination check
+for(Container::iterator it= temp_sampled_dominated.begin() ; it !=  temp_sampled_dominated.end() ; ++it){
+HISTORY.insert( entry(it->first , it->second ) );
+IM.addIfNotDominated( entry(it->first , it->second ) );
+}
+break;
+//end of internal switch for domination_counter=1
+default :
+
+#ifdef DEBUG
+cout << "\t\tdomination_counter>1 " << endl;
+#endif
+nextPoint=  temp_sampled_dominant.selectRandom() ;
+temp_sampled_dominant.erase(nextPoint); //remove the base point
+random_select=0;
+
+//following the selection of base point, the points who live in temp_sample_dominaNT!!!! are due to domination check
+for(Container::iterator it= temp_sampled_dominant.begin() ; it !=  temp_sampled_dominant.end() ; ++it){
+HISTORY.insert( entry(it->first , it->second ) );
+IM.addIfNotDominated( entry(it->first , it->second ) );
+}
+//end of internal switch for domination_counter>1
+}
+
+
+#ifdef DEBUG
+cout << "\tSECOND CHANCE - end" << endl;
+#endif
+break;
+//end of case 0
+case 1 :
+
+#ifdef DEBUG
+cout << "\tdomination_counter==1" << endl;
+#endif
+nextPoint= temp_sampled_dominant.begin()->first;
+random_select=0;
+//following the selection of base point, the points who live in temp_sample_dominaTED!!!! are due to domination check
+for(Container::iterator it= temp_sampled_dominated.begin() ; it !=  temp_sampled_dominated.end() ; ++it){
+HISTORY.insert( entry(it->first , it->second ) );
+IM.addIfNotDominated( entry(it->first , it->second ) );
+}
+break;
+//end of case 1
+default :
+#ifdef DEBUG
+cout << "\tdomination_counter>1 " << endl;
+#endif
+nextPoint=  temp_sampled_dominant.selectRandom() ;
+temp_sampled_dominant.erase(nextPoint); //remove the base point
+random_select=0;
+
+//following the selection of base point, the points who live in temp_sample_dominaNT!!!! are due to domination check
+for(Container::iterator it= temp_sampled_dominant.begin() ; it !=  temp_sampled_dominant.end() ; ++it){
+HISTORY.insert( entry(it->first , it->second ) );
+IM.addIfNotDominated( entry(it->first , it->second ) );
+}
+}// end of switch
+IM.removeDominatedPoints();
+
+	 */
+	/////////////////// telos
+	++iLocal ;
+	/*Points.push_front(nextPoint);
+iIter=Points.begin(); */ //since iIter should point to the most recent (it), and because push_back is used
+	//then, the item is located on the top of the list
+	//iIter++ would point to the penultimate, etc....
+
+	Push_Base_Point(nextPoint, "HJMove");
+
+#ifdef DEBUG
+	cout << "\t>>>newly inserted point @ H&J is" << *iIter << endl;
+#endif
+	//TODO : to be improved, prin apo ka8e evaluation, anazhtatai sto history an uparxoun hdh data
+	nextMoveHookeJeeves=0;
+	bestPoints.clear();
+
+	temp_sampled.erase(nextPoint);
+	for(Container2::iterator it=temp_sampled.begin() ; it!=temp_sampled.end(); ++it){
+		IM.addIfNotDominated(it->first , it->second);
+	}
+
+	IM.removeDominatedPoints();
+
+#ifdef DEBUG
+	cout << "H&J EXIT " << endl;
+#endif
+
+
+
+
+	//empty bestPoints for the current run
+}
+
+
+
+
+
+void TabuSearch::HookeJeevesMove_parallel(unsigned int loop){
+	unsigned int i; //for counter
+	Container2::iterator it;
+
+	//unsigned int domination_counter=0;
+	int remaining_sample_sets;
+	//int random_select=0;
+
+	//if no points dominate the current point on the first random selection
+	temp_Container2 bestPoints;// = new temp_Container; // for H & J move
+
+	//temp_Container *remainingPoints = new temp_Container; //to reduce many evaluations
+	Container2 temp_sampled(nVar,nObj,"HJ_P1"); // for H & J move, MOTS "strategy"
+
+	Container2 temp_sampled_dominant(nVar,nObj,"HJ_P2"); // = new Container;
+	Container2 temp_sampled_dominated(nVar,nObj,"HJ_P3");// = new Container;
+	Container2 C1(nVar,nObj,"HJ_P4");
+	Container2 buffer_container(nVar,nObj,"HJ_P5");
+
+	Point2 newPoint;
+	Point2 tempPoint;
+	Point2 nextPoint;
+	Point2 currentPoint;
+	ObjFunction2 tempObjFunc;
+	ObjFunction2 currentObjFunc;
+	Point2 nullVector;
+
+	for(unsigned int k=0; k<nullVector.size(); ++k)
+		nullVector[k]=0;
+
+	//for external use! START
+
+
+	Point2 currentObjFun;
+#ifdef DEBUG
+	cout << "HookeJeevesMove START" << endl;
+#endif
+	currentPoint= *iIter; //currentPoint = points(iIter) ;
+	currentObjFunc= HISTORY[currentPoint];
+
+
+#ifdef DEBUG
+	cout << "\tcur point" << endl << currentPoint <<endl;
+	cout << "\tcurrent steps" << endl << CurrentStep << endl;
+
+	cout << "\twithin tabu" << endl;
+	STM.showTabu();
+
+	cout << "\tupper bound " << TS_ObjFunc.max_bound << endl;
+	cout << "\tlower bound " << TS_ObjFunc.min_bound << endl;
+
+#endif
+
+
+	bestPoints.clear();
+
+
+
+
+	//////////////////////////////////////////////////////////////
+
+	//generate local points to be evaluated2!
+	Point2 pointBeforeStepping  = currentPoint;
+
+	Point2 newPoint_incr, newPoint_decr;
+	//	double temp_step;
+	//	double temp_value;
+	initialise_vector(newPoint_decr, 0);
+	initialise_vector(newPoint_incr, 0);
+	newPoint_decr=currentPoint;
+	newPoint_incr=currentPoint;
+
+
+	for ( i=0 ; i < nVar ; ++i) { //each designVariable
+
+
+
+		newPoint_incr=increase(currentPoint,i) ;
+#ifdef DEBUG
+		cout  <<  "\tduring perturbation(+) " << newPoint_incr << " was created! " << endl;
+		cout << "\tis tabu" << STM.isTabu(newPoint_incr) << " and valid" << TS_ObjFunc.isValid(newPoint_incr) << endl;
+#endif
+		if ( !STM.isTabu(newPoint_incr) &&  TS_ObjFunc.isValid(newPoint_incr)  ){ // isNotTabu(newPoint_incr) and isNotInvalid (newPoint_incr)
+			//cout << "tabu and validity check pass" << endl;
+			bestPoints.insert(newPoint_incr);
+#ifdef DEBUG
+			cout << "\tPoints inserted!" << endl;
+#endif
+		}
+
+		newPoint_decr=decrease(currentPoint,i) ;
+		//newPoint_decr[i]=temp_value - temp_step ;
+#ifdef DEBUG
+		cout  << "\tduring perturbation(-) " << newPoint_decr << " was created! " << endl;
+		cout << "\tis tabu" << STM.isTabu(newPoint_decr) << " and valid" << TS_ObjFunc.isValid(newPoint_decr) << endl;
+#endif
+		if ( !STM.isTabu(newPoint_decr) && TS_ObjFunc.isValid(newPoint_decr) ){ // isNotTabu(newPoint) and isNotInvalid (newPoint)
+			//cout << "tabu and validity check pass" << endl;
+			bestPoints.insert(newPoint_decr);
+#ifdef DEBUG
+			cout << "\tPoints inserted!" << endl;
+#endif
+		}
+
+
+	}
+
+
+	remaining_sample_sets=(int)(bestPoints.size()/n_sample);
+	if(bestPoints.size()%n_sample!=0)
+		++remaining_sample_sets;
+
+
+#ifdef DEBUG
+	int total_sets=remaining_sample_sets;
+	unsigned int generated_points=bestPoints.size();
+	cout << "\t<bestPoints><size> There are" << generated_points <<" generated elements in best points</size>" << endl;
+	cout << "\t<sample_set>which form" <<  remaining_sample_sets << "SAMPLE SETS!</sample_set></bestPoints>" << endl;
+
+#endif
+
+
+	if(bestPoints.size()==0){
+		if(IM.size()>0){
+			Point2 tempPnt=IM.selectRandom();
+			IM.erase(tempPnt);
+			++remaining_sample_sets;
+			bestPoints.insert(tempPnt);
+#ifdef DEBUG
+			cout << "design:" << tempPnt << " was selected from IM" << endl;
+			cout << "\t<bestPoints><size> contains " << bestPoints.size() <<" candidate points</size>" << endl;
+			cout << "\t<sample_set>which form" <<  remaining_sample_sets << "SAMPLE SETS!</sample_set></bestPoints>" << endl;
+			cout << "IM's size " << IM.size() << endl;
+#endif
+
+		}else{
+			cout << "algorithm trapped, neither good candidate point was generated, nor IM has any candidate point" << endl;
+			save_memories(loop);
+			exit(-3000);
+		}
+	}
+
+
+	////PRIN THN TROPOIOPOHSH
+	/*
+	 * ATTENTION!!!
+	 *
+	 * the steps in pseudocode differ, I reorder these steps logically so that the same functionality is achieved
+	 */
+
+
+
+	//00000000000000000000000000000000000000000000000000000000000000000000000000000000
+	//00000000000000000000000000000000000000000000000000000000000000000000000000000000
+	//approach 3_Nov
+
+	Container2 evaluation_buffer(nVar,nObj,"HJ_P6");//this contains the points to be sent for evaluation and then its entries are  updated
+
+	//random sampling
+	int set_counter=-1;
+	while( bestPoints.size()>0 and remaining_sample_sets>0){
+		++set_counter;
+#ifdef DEBUG
+		cout << "\t set " << set_counter  << " out of" << 	total_sets << endl;
+#endif
+		for(  i=0 ; i<n_sample and 0<bestPoints.size() ; ++i){ //evaluate 6 Points
+#ifdef DEBUG
+			cout << "\t sample "<< i << endl;
+#endif
+			tempPoint=bestPoints.selectRandom();
+			bestPoints.erase(tempPoint);
+			evaluation_buffer.insert(entry( tempPoint , TS_ObjFunc.failedObjectiveFunctionVector ) );
+		}
+
+
+		evaluate_point_parallel(evaluation_buffer);
+		for(Container2::iterator it=evaluation_buffer.begin(); it!=evaluation_buffer.end(); ++it)
+			temp_sampled.insert(entry( it->first , it->second ) );
+
+		evaluation_buffer.clear();
+
+
+		for(Container2::iterator it1=temp_sampled.begin(); it1!=temp_sampled.end(); ++it1){
+			if(    MTM.addIfNotDominated(   it1->first, it1->second     )==1  )
+				temp_sampled_dominant.insert( entry (  it1->first, it1->second  ) );
+			else
+				temp_sampled_dominated.insert( entry ( it1->first, it1->second ) );
+		}
+
+#ifdef DEBUG
+		cout << "so far" << temp_sampled_dominant.size() << " dominant were found!" << endl;
+
+		cout << "\tmemories" << endl;
+		cout << "\tdominant ="<< temp_sampled_dominant.size() << endl;
+		cout << "\tdominated =" <<temp_sampled_dominated.size()<<endl;
+#endif
+		switch ( temp_sampled_dominant.size() ) {
+		case 0 : //not dominant points found"
+#ifdef DEBUG
+			cout << "\t<ZERO_dominant> in " << set_counter << "th set, " << temp_sampled_dominant.size() << " points dominate </ZERO_dominant>" <<endl;
+#endif
+			--remaining_sample_sets;
+			break;	//end of case 0
+		case 1 : //the point is selected as basePoint / nextPoint
+			//TODO: merge the following case =1 and case >1
+#ifdef DEBUG
+			cout << "\t<ONE_dominant> in " << set_counter << "th set, " << temp_sampled_dominant.size() << " points dominate </ONE_dominant>" <<endl;
+#endif
+			nextPoint=temp_sampled_dominant.begin()->first;
+			remaining_sample_sets=0;
+			break;	//end of case 1
+		default :
+#ifdef DEBUG
+			cout << "\t<N_dominant> in " << set_counter << "th set, " << temp_sampled_dominant.size() << " points dominate </N_dominant>" <<endl;
+#endif
+			nextPoint=temp_sampled_dominant.selectRandom();
+			remaining_sample_sets=0;
+			break;
+		}// end of switch
+	}
+
+	if( temp_sampled_dominant.size()==0 and temp_sampled_dominated.size()>0 ){
+#ifdef DEBUG
+		cout << "\t<report>sampling ended, dominant points were NOT found </report>" << endl;
+#endif
+		buffer_container=temp_sampled;
+		buffer_container.removeDominatedPoints();
+
+		if(buffer_container.size()!=0){
+#ifdef DEBUG
+			cout << "\t<report>out of the dominated, the dominant was selected </report>" << endl;
+#endif
+			nextPoint=buffer_container.selectRandom();
+		}else{
+#ifdef DEBUG
+			cout << "\t<report>out of the dominated, neither dominates! random among ALL </report>" << endl;
+#endif
+			nextPoint=temp_sampled.selectRandom();
+		}
+	}
+
+
+
+	/////////////////// telos
+	++iLocal ;
+	/*Points.push_front(nextPoint);
+iIter=Points.begin(); */ //since iIter should point to the most recent (it), and because push_back is used
+	//then, the item is located on the top of the list
+	//iIter++ would point to the penultimate, etc....
+
+	Push_Base_Point(nextPoint, "HJMove");
+
+#ifdef DEBUG
+	cout << "\t>>>newly inserted point @ H&J is" << *iIter << endl;
+#endif
+	//TODO : to be improved, prin apo ka8e evaluation, anazhtatai sto history an uparxoun hdh data
+	nextMoveHookeJeeves=0;
+	bestPoints.clear();
+
+	temp_sampled.erase(nextPoint);
+	for(Container2::iterator it=temp_sampled.begin() ; it!=temp_sampled.end(); ++it){
+		IM.addIfNotDominated(it->first , it->second);
+	}
+
+	IM.removeDominatedPoints();
+
+#ifdef DEBUG
+	cout << "H&J EXIT " << endl;
+#endif
+
+
+
+
+	//empty bestPoints for the current run
+}
+
+
+
+
+
+
+//Algorithm 9
+Point2 TabuSearch::DiversifyMove2(){
+	Point2 newPoint(nVar,0.0);
+	ObjFunction2 newObjFunc(nObj,0.0);
+
+#ifdef DEBUG
+	cout << "DiversifyMove " << endl;
+#endif
+	int patience=20;
+	do{
+
+#ifdef DEBUG
+		cout << "\t<message>Div Move: find region with minimum changes ang generate new point </message>" << endl;
+		cout << "\t<size>LTM size before selection = "<< LTM.getSize() << "</size>"<< endl;
+#endif
+		newPoint=LTM.generate_Random_Point_From_Least_Visited_Region2();
+		//correct_accuracy(newPoint); //div2
+#ifdef DEBUG
+		cout << "\t<message> Div Move: new Point @ random selection </message> " << endl;
+		cout << "\t<np>" << newPoint << "</np>" << endl;
+
+		cout << "\t<bp>basePoint is =" << newPoint << "</bp>"<< endl;
+		if (newPoint.empty())
+			cout << "\t<error>ERROR: empty basePoint at DiversifyMove</error>" << endl;
+		if (HISTORY.find(newPoint)==HISTORY.end())
+			cout << "\t<error>ERROR: empty Objective Vector for basePoint at DiversifyMove</error>" << endl;
+#endif
+		--patience;
+	}while ( (STM.isTabu(newPoint) || (!TS_ObjFunc.isValid(newPoint))) &&  (patience!=0) /*!isValid( newPoint )*/ );
+
+	if(patience==0)
+		newPoint=TabuSearch::IntensifyMove2();
+
+	evaluate_point(newPoint);
+
+#ifdef DEBUG
+	cout << "\tDiv move" << endl << newPoint << endl;
+#endif
+
+
+
+	//Points.push_front(newPoint); //va
+	//iIter=Points.begin(); //vb
+
+	++iLocal;
+	++diversification;
+	nextMoveHookeJeeves = 1 ;
+
+
+#ifdef DEBUG
+	cout << "Diversify EXIT " << endl;
+#endif
+
+	return newPoint;
+}
+
+//Algorithm 10
+Point2 TabuSearch::IntensifyMove2(){
+	Point2 newPoint(nVar,0.0);
+	ObjFunction2 newObjFunc(nObj,0.0);
+#ifdef DEBUG
+	cout << "IntensifyMove START" << endl;
+	cout << " IM size" << IM.size() << endl;
+#endif
+
+
+	do{
+		newPoint = IM.selectRandom();
+		//correct_accuracy(newPoint);//int2
+#ifdef DEBUG
+		cout << "\tIntensification loops" << endl << newPoint << endl;
+		cout << "\tIM size" << IM.size() << endl;
+#endif
+
+		IM.erase(newPoint); //remove point
+	}while( STM.isTabu(newPoint) and IM.size()>0); //TOCHANGE: condition maybe wrong
+
+#ifdef DEBUG
+	cout << "\tcheck after loops" << endl;
+	cout << " IM size" << IM.size() << endl;
+#endif
+
+
+	//newObjFunc=evaluate_point(newPoint); //v2
+
+	//Points.push_front(newPoint); //va
+	//iIter=Points.begin(); //va
+
+	++iLocal;
+	++intensification;
+	nextMoveHookeJeeves = 1 ;
+
+
+#ifdef DEBUG
+	cout << "IntensifyMove EXIT" << endl;
+#endif
+
+	return newPoint;
+
+}
+
+//Algorithm 11
+Point2 TabuSearch::ReduceMove2(){
+
+	Point2 newPoint(nVar,0.0);
+	ObjFunction2 newObjFunc(nObj,0.0);
+
+#ifdef DEBUG
+	cout << "ReduceMove START" << endl;
+	cout << "\tIM size" << IM.size() << endl;
+#endif
+
+	do{
+		newPoint = IM.selectRandom();
+		//correct_accuracy(newPoint);//red2
+#ifdef DEBUG
+		cout << "\t Reduction iteration" << endl << newPoint << endl;
+#endif
+
+	}while( STM.isTabu(newPoint)  );
+
+
+
+	for(unsigned int i=0; i<nVar; ++i)
+		CurrentStep[i]*=SSRF;
+
+
+	//InitialStep[index]* pow(SSRF,reduction);
+
+	/////CA correct_accuracy(CurrentStep);//red2
+
+#ifdef DEBUG
+	if(newPoint.empty())
+		cout << "\t empty point!" << endl;
+	if(newObjFunc.empty())
+		cout << "\t empty objective!" << endl;
+#endif
+
+	//	Points.push_front(newPoint);
+	//	iIter=Points.begin();
+
+	iLocal=0;
+	++reduction;
+	nextMoveHookeJeeves = 1 ;
+
+
+#ifdef DEBUG
+	cout << "ReduceMove EXIT" << endl;
+#endif
+
+	return newPoint;
+
+}
+void produce_file(char const *name, Point2 const &variable_vector){
+
+}
+
+void read_file(char const *name, ObjFunction2 &objective_vector){
+
+}
+
+#ifdef external
+template<typename T>
+ObjFunction2  ObjectiveFunctionBasic<T>::eval_external_evaluator(Point2 &input){
+	//originally, before March 2012, ekana ena obj fun vector me 0.0 kai meta to evaza megalh timh
+
+	//change on 22 March 2012
+	ObjFunction2 output(failedObjectiveFunctionVector);
+
+
+	//produce variable file
+	ofstream file_out(variables_name);
+
+	for(unsigned int i=0; i<input.size(); ++i)
+		file_out << input[i] << " ";
+
+	file_out << endl;
+	file_out.close();
+
+	//evaluate through external evaluator
+	cout << "waiting external objective"<<endl;
+	(void)system(evaluator);
+
+
+	//wait
+	do{
+#if defined(_WIN32) || defined(_WIN64) || defined(__WIN32) || defined(WINDOWS) && !defined(__CYGWIN__)
+		Sleep(READ_TIME); // micro-seconds
+#endif
+
+#if defined(__gnu_linux__)   || defined(__linux__)
+		usleep(READ_TIME); // micro-seconds
+#endif
+	}while( !FileExists(objectives_name) );
+
+
+	//read objectives file
+	ifstream file_in(objectives_name);
+
+	for(unsigned int i=0; i<output.size(); ++i)
+		file_in >> output[i];
+
+	file_in.close();
+
+	//delete objectives file
+	remove(objectives_name);
+
+	return output;
+}
+#endif //external
+
+#ifdef xfoil
+template<typename T>
+ObjFunction2  ObjectiveFunctionBasic<T>::eval_user_defined_function(Point2 &input){
+	ObjFunction2 output(failedObjectiveFunctionVector);
+
+
+	/*	//example of ZDT4 implementation
+if( input.size() != 10){
+cout << " ZDT4 input has" << input.size() << "variables, instead of 10" << endl;
+exit(-100);
+}
+	 */
+	int i = 0;
+	int n = input.size();
+	/*	double f1 = 0;
+double g = 0;
+double h = 0;
+
+
+assert(n == 10); //variable vector length
+assert(output.size() == 2);
+
+f1 = input[0];
+cout << "var[0] = " << input[0] << endl;
+for (i = 1; i < n; i++)
+{
+double x = input[i];
+g += x * x - 10 * cos(4 * pi * x);
+cout << "var[" << i << "] = " << input[i] << endl;
+}
+g = 1 + 10 * (n - 1) + g;
+h = 1 - sqrt(f1 / g);
+
+output[0]=f1;
+output[1] = g * h;
+	 */
+	const int n_vara=8;
+	//    const int n_vara=nreal;
+	int ncp[2];
+	//    double init_vars[n_vara];
+	double x0_ffd[n_vara+8];
+	//    double ffd_dpx[100];
+	double ffd_dpx[500];
+	//    double ffd_dpy[100];
+	double ffd_dpy[500];
+	//    float ffd_dp[100][2];
+	int ffd_flag=0, ffdflag=0;
+	int xfoil_flag=0, xfoilflag=0;
+	double cl=0., cd=0.;
+	int np;
+	/*
+ifstream i_vector("design_vector", ios::in);
+
+for (int i=0; i<n_vara; i++) {
+i_vector >> init_vars[i];
+//        cout << "init_vars[" << i << "] = " << init_vars[i] << endl;
+}
+
+i_vector.close();
+	 */
+
+	ncp[0]=4;
+	ncp[1]=2;
+
+
+	for (unsigned int i=0; i<n_vara+8; i++) {
+
+		x0_ffd[i] = 0.0;
+	}
+
+	for (int i=0; i<n_vara; i++) {
+
+		//                    x0_ffd[i+4] = init_vars[i];
+		x0_ffd[i+4] = input[i];
+		//                    cout << "x0_ffd[" << i+4 << "] = " << x0_ffd[i+4] << endl;
+	}
+
+	//     char ff1[30]="ffd%s.def";
+	//     char ff[]="";
+	//     char remov1[50]="rm ffd%s.def";
+	//     char remov[]="";
+	pid_t mypid=getpid();
+	char extn[8];
+	gcvt(mypid,7,extn);
+	//     sprintf(ff,ff1,extn);
+	//     sprintf(remov,remov1,extn);
+	string ff1 = string("ffd.") + string(extn);
+	const char* ff = ff1.c_str();
+
+	ffd_flag = ffd_(x0_ffd[0], ncp, ffd_dpx[0], ffd_dpy[0],np, ffdflag);
+	//	    ffd_flag = ffd_(x0_ffd, ncp, ffd_dp[0][0]);
+	//            cout << "np from ffd... = " << np << endl;
+
+	//    ofstream ffd_vector("ffd_deformed", ios::out);
+
+	xfoil_flag = xfoil_(cl, cd, ff, xfoilflag, ffd_dpx[0], ffd_dpy[0], np);
+	//     xfoil_flag = xfoil_(cl, cd, ff, xfoilflag);
+
+	if (xfoilflag==0 && xfoil_flag==0 && isfinite(cl/cd) != 0) {
+		cout << "XFOIL successful..." << endl;
+		output[0] = -(cl/1.4644);
+		output[1] = cd/0.03051;
+	} else {
+		cout << "XFOIL NOT successful..." << endl;
+		output[0] = 100;
+		output[1] = 100;
+
+	}
+
+	cout << "obj1 = " << output[0] << endl;
+	cout << "obj2 = " << output[1] << endl;
+
+
+	return output;
+}
+
+
+#endif //external
+
+#ifdef external2
+
+
+
+
+template<typename T>
+ObjFunction2  ObjectiveFunctionBasic<T>::eval_external_evaluator2(Point2 &input){
+
+	ObjFunction2 output(failedObjectiveFunctionVector);
+
+
+	//produce variable file
+	ofstream file_out(variables_name);
+
+	for(unsigned int i=0; i<input.size(); ++i)
+		file_out << input[i] << " ";
+
+	file_out << endl;
+	file_out.close();
+
+	//evaluate through external evaluator
+	cout << "EXT EVLTR2 waiting external objective"<<endl;
+
+
+
+	//wait
+	do{
+#if defined(_WIN32) || defined(_WIN64) || defined(__WIN32) || defined(WINDOWS) && !defined(__CYGWIN__)
+		Sleep(READ_TIME); // micro-seconds
+#endif
+
+#if defined(__gnu_linux__)   || defined(__linux__)
+		usleep(READ_TIME); // micro-seconds
+#endif
+	}while( !FileExists(objectives_name) );
+
+
+	//read objectives file
+	ifstream file_in(objectives_name);
+
+	for(unsigned int i=0; i<output.size(); ++i)
+		file_in >> output[i];
+
+	file_in.close();
+
+	//delete objectives file
+	remove(objectives_name);
+
+	return output;
+}
+
+
+template<typename T>
+void  ObjectiveFunctionBasic<T>::eval_external_evaluator2_parallel(std::map<Point2,ObjFunction2> &inCont){
+
+	//produce variable file
+	ofstream file_out(variables_name);
+	for(Container2::iterator it=inCont.begin(); it!=inCont.end(); ++it)
+		file_out << it->first << endl;
+
+	file_out << endl;
+	file_out.close();
+
+	//evaluate through external evaluator
+	cout << "EXT EVLTR2 || waiting external objective"<<endl;
+
+
+
+	//wait
+	do{
+#if defined(_WIN32) || defined(_WIN64) || defined(__WIN32) || defined(WINDOWS) && !defined(__CYGWIN__)
+		Sleep(READ_TIME); // milliseconds
+#endif
+
+#if defined(__gnu_linux__)   || defined(__linux__)
+		usleep(READ_TIME); // micro-seconds
+#endif
+	}while( !FileExists(objectives_name) );
+
+
+	//read objectives file, once created
+	ifstream file_in(objectives_name);
+
+	for(Container2::iterator it=inCont.begin(); it!=inCont.end(); ++it)
+		for(unsigned int i=0; i<nObj; ++i)
+			file_in >> it->second[i];
+
+	file_in.close();
+
+	//delete objectives file
+	remove(objectives_name);
+
+
+}
+#endif //external2
+
+template<typename T>
+void  ObjectiveFunctionBasic<T>::eval_internal_parallel(std::map<Point2,ObjFunction2> &inCont){
+	Point2 input(nVar,0);
+	ObjFunction2 output(failedObjectiveFunctionVector);
+
+	for(std::map<Point2,ObjFunction2>::iterator it=inCont.begin(); it!=inCont.end(); ++it){
+		input=it->first;
+
+#ifdef ZDT1
+		output=eval_ZDT1(input );
+#endif
+		//-------------
+#ifdef ZDT2
+		output=eval_ZDT2(input );
+#endif
+		//-------------
+#ifdef ZDT3
+		output=eval_ZDT3(input );
+#endif
+		//-------------
+#ifdef ZDT4
+		output=eval_ZDT4(input );
+#endif
+		//-------------
+#ifdef ZDT6
+		output=eval_ZDT6(input );
+#endif
+
+#ifdef DTLZ1
+		output=eval_DTLZ1(input, nObj);
+#endif
+
+#ifdef DTLZ2
+		output=eval_DTLZ2(input, nObj);
+#endif
+
+#ifdef DTLZ3
+		output=eval_DTLZ3(input, nObj);
+#endif
+
+#ifdef DTLZ4
+		output=eval_DTLZ4(input, nObj);
+#endif
+
+#ifdef DTLZ5
+		output=eval_DTLZ5(input, nObj);
+#endif
+
+#ifdef DTLZ6
+		output=eval_DTLZ6(input, nObj);
+#endif
+
+#ifdef DTLZ7
+		output=eval_DTLZ7(input, nObj);
+#endif
+
+		inCont[input]=output;
+	}
+}

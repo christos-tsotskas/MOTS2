@@ -1,0 +1,8 @@
+ LTM regions
+ region 0: 30 size 
+ region 1: 30 size 
+ region 2: 30 size 
+ region 3: 30 size 
+ IM 0 0 empty variables and objectives 
+ MTM 0 0 empty variables and objectives 
+ HISTORY 0 0 empty variables and objectives 

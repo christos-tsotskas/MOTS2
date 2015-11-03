@@ -1,0 +1,158 @@
+# A Generic Makefile for mixed C/C++ and Fortran, Christos Tsotskas
+## 'make depend' uses makedepend to automatically generate dependencies 
+#               (dependencies are added to end of Makefile)
+## 'make'        build executable file, as specified in PROJECT (below)
+## 'make clean'  removes all .o and executable files
+##
+#
+#
+#Section 1 - Files
+#define the source files
+C_SRC=  #   
+
+CPP_SRC= basepoint_memory.cpp configuration_settings.cpp container.cpp external_configuration_file.cpp latin_hypercube.cpp long_term_memory.cpp main.cpp mapping_tuple.cpp mots.cpp objective_function.cpp objective_function_formulae.cpp objective_function_module.cpp optimisation_problem.cpp pca2.cpp short_term_memory.cpp temp_container.cpp  test_suite.cpp verification_code.cpp
+
+CU_SRC= test.cu
+ 
+F_SRC= #
+
+F_INCLUDE= #
+
+CPP_INCLUDE = basepoint_memory.h cutil_inline.h configuration_settings.h container.h external_configuration_file.h global_defines.h  latin_hypercube.h long_term_memory.h mapping_tuple.h mots.h objective_function_formulae.h objective_function.h objective_function_module.h optimisation_problem.h pca2.h pca2.hpp short_term_memory.h temp_container.h test.cuh test_suite.h verification_code.h 
+
+#
+#other mandatory files
+MAND_FILES= #
+#
+# define the project - executable file
+PROJECT = CUDA_MOTS2_v3 
+#
+#
+#Section 2 - Directories
+OBJ_DIR= temp_obj
+#libraries directory
+LIB_DIR= #
+#other directories
+#
+#Section 3 - Structure
+# # define the object files 
+# #
+# # This uses Suffix Replacement within a macro:
+# #   $(name:string1=string2)
+# #         For each word in 'name' replace 'string1' with 'string2'
+# # Below we are replacing the suffix .cpp of all words in the macro CPP_SRC
+# # with the .o suffix
+# #
+C_OBJS=$(C_SRC:.c=.o)
+CPP_OBJS = $(CPP_SRC:.cpp=.o)
+CU_OBJS = $(CU_SRC:.cu=.o)
+F_OBJS = $(F_SRC:.f=.o)
+#
+OBJS = $(C_OBJS) $(CPP_OBJS) $(F_OBJS) $(CU_OBJS)
+OBJS_FILES_LIST= $(foreach file,$(OBJS),  $(OBJ_DIR)/$(file))
+#
+LIB_FILES= #
+#
+LINKING_FILES_LIST += # 
+#
+#Section 4 - Code Generation Tools and Options
+#
+## define compilers to use
+C_COMPILER = gcc
+CPP_COMPILER = nvcc #g++ 
+F_CHK=chk72
+F_COMPILER=g77
+#
+## define any compile-time flags
+C_FLAGS = -O3 -gencode arch=compute_20,code=sm_20  -x cu # -I . -Wall -W -Wmissing-prototypes -Wshadow -Wtraditional -Wnested-externs
+F_FLAGS = #-fno-underscoring -g  -Wno-globals -Wimplicit -Wunused -Wuninitialized -Wsurprising -Werror -Wall -W -O -ffortran-bounds-check -finit-local-zero -x f77-cpp-input
+#Fortran preprocessing directives in C++ way
+FPP_DIRECTIVE= #-DDEBUG
+F_FLAGS += $(FPP_DIRECTIVE)
+#
+## define any directories containing header files other than /usr/include
+# 
+INCLUDES = #-I../include# 
+#
+##define the linker
+LINKER= $(CPP_COMPILER)
+#
+#d#efine link flags
+# define library paths in addition to /usr/lib
+#    if I wanted to include libraries not in /usr/lib I'd specify
+#    their path using -Lpath, something like:
+LFLAGS = #-L/home/newhall/lib  -L../lib
+# define any libraries to link into executable:
+#   if I want to link in libraries (libx.so or libx.a) I use the -llibname 
+#   option, something like (this will link in libmylib.so and libm.so:
+C_LFLAGS = -lm -lutil #  -lg2c
+F_LFLAGS = #
+LFLAGS+= $(C_LFLAGS) $(F_LFLAGS)
+#
+#
+#
+#Section 5 - Main body
+# #
+# # The following part of the makefile is generic; it can be used to 
+# # build any executable just by changing the definitions above and by
+# # deleting dependencies appended to the file from 'make depend'
+# #
+#
+.PHONY: all compile check_files depend clean
+#
+all:  $(PROJECT) 
+	@echo  $(PROJECT) Succesfully Generated in $(PROJECT)
+#	
+#
+$(PROJECT): $(OBJS_FILES_LIST) $(LINKING_FILES_LIST) 
+	@echo Linking...
+	$(LINKER) -o $@ $^ $(LFLAGS)  >> linkout	
+#
+# # this is a suffix replacement rule for building .o's from .cpp's
+# # it uses automatic variables $<: the name of the prerequisite of
+# # the rule(a .cpp file) and $@: the name of the target of the rule (a .o file) 
+# # (see the gnu make manual section about automatic variables)
+#
+$(OBJ_DIR)/%.o: %.c
+	@echo Compiling C files...
+	$(C_COMPILER) $(C_FLAGS) $(INCLUDES) -c $<  -o $ $@ >> output
+#	
+#.cpp.o: 
+$(OBJ_DIR)/%.o: %.cpp $(CPP_INCLUDE)
+	@echo Compiling C++ files...
+	$(CPP_COMPILER) $(C_FLAGS) $(INCLUDES) -c $<  -o $@ >> output
+#
+$(OBJ_DIR)/%.o: %.cu $(CPP_INCLUDE)
+	@echo Compiling CUDA files...
+	$(CPP_COMPILER) $(C_FLAGS) $(INCLUDES) -c $<  -o $@ >> output	
+#
+#	
+$(OBJ_DIR)/%.o: %.f $(F_INCLUDE)
+	@echo Checking Fortran files...
+	$(F_CHK) $<
+	@echo Compiling Fortran files...	
+	$(F_COMPILER)  $(F_FLAGS)  $(INCLUDES) -c $< -o $@ 	>> output
+#	
+#
+run:
+	./$(LIB_DIR)/$(PROJECT)
+copy:	 
+	@echo new version of $(PROJECT) was copied
+#
+clean:
+	@echo Cleaning...
+	date > output	 
+	date > linkout
+	rm $(OBJS_FILES_LIST) *~ $(PROJECT)
+#	
+edit:
+	gedit $(C_SRC) &	
+#	
+#check_files: $(MAND_FILES)
+#	 cp 
+#	 
+#Section 6 - Footer
+depend: $(C_SRC) $(CPP_SRC)
+	makedepend $(INCLUDES) $^
+#
+## DO NOT DELETE THIS LINE -- make depend needs it

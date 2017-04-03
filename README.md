@@ -1,6 +1,10 @@
 # MOTS2
 Multi-Objective Tabu Search 2
 
+# LICENCE
+
+By cloning/downloading/forking this repository (or part of it), you automatically agree and accept the license terms.
+
 Reference one of the following:
 
 ```

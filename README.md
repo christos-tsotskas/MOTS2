@@ -1,6 +1,15 @@
 # MOTS2
 Multi-Objective Tabu Search 2
 
+# python extension
+
+python 3
+
+# DevOps
+
+Coverage:
+[![Coverage Status](https://coveralls.io/repos/github/christos-tsotskas/MOTS2/badge.svg?branch=master)](https://coveralls.io/github/christos-tsotskas/MOTS2?branch=master)
+
 # LICENCE
 
 By cloning/downloading/forking this repository (or part of it), you automatically agree and accept the license terms.

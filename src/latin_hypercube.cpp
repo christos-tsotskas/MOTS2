@@ -139,7 +139,7 @@ int addIfNotDominated(map<Point2,ObjFunction2> &memory, const Point2 &V1,const O
 	for (map<Point2,ObjFunction2>::iterator it=memory.begin() ; it!= memory.end() ; ++it)
 		if( dominates(  it->second  ,  O1 )==1)  //first is the existing point
 			return 0;
-	memory.insert( tuple(V1, O1) );
+	memory.insert( std::pair<Point2,ObjFunction2>(V1, O1) );
 	return 1;
 }
 

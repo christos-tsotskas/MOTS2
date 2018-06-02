@@ -2,9 +2,11 @@
 // stripped-down version of cutil_inline.h from CUDA 3.2 SDK
 //
 
+#ifdef GPU_evaluation
 #include <cstdio>
 #include <cuda.h>
 #include <cuda_runtime_api.h>
+
 #include <math_constants.h>
 
 #include "global_defines.h"
@@ -71,4 +73,5 @@ inline double elapsed_time(double *et) {
 
 
 
+#endif
 #endif

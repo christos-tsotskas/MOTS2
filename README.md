@@ -76,3 +76,4 @@ MOTS2, on its own is licensed under the Apache model.
 In addition, the following packages were also used that follow individual licensing schemes.
 
 - easylogging++ , v9.96.4, https://github.com/muflihun/easyloggingpp, MIT license
+- catch2, v2.2.2, https://github.com/catchorg/Catch2, BSL-1 license

@@ -8,6 +8,7 @@
 
 
 //library that contains the tabu search function
+//#include "../include/spdlog/spdlog.h"
 //#include <cstring>
 #include <sstream>
 #include <fstream>
@@ -22,9 +23,15 @@
 
 #include <vector>
 
+#include "easylogging++.h"
+
+INITIALIZE_EASYLOGGINGPP
 
 int main(int argc, char *argv[]){
 	std::cout << "MOTS2 main" << std::endl;
+
+	LOG(INFO) << "MOTS2 info log using default logger";
+
 
 	std::string external_name;
 	int flag=0;

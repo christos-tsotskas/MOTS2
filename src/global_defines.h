@@ -36,10 +36,10 @@
 /* ATTENTION!!!!!!!!
  * if user_defined, xfoil, external, external2 options are selected, then the ranges need to be specified
  */
-#define external
+//#define external
 //#include "interface.h" //for my framework
 
-//#define CONTROL_TEST_FUNCTIONS
+#define CONTROL_TEST_FUNCTIONS
 
 /*
  *  the following files will be created (the ./monitor_data directory should exist in in advance)

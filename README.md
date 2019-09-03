@@ -1,6 +1,20 @@
 # MOTS2
 Multi-Objective Tabu Search 2
 
+# file structure
+
+For each application, the folders are:
+
+- bin: The output executables go here, both for the app and for any tests and experiments.
+- build: This folder contains all object files, and is removed on a clean.
+- config: create the development and production config files
+- doc: Any notes, like  assembly notes and configuration files, are here.
+- include: All project header files. All necessary third-party header files that do not exist under /usr/local/include are also placed here.
+- lib: Any libs that get compiled by the project, third party or any needed in development. Prior to deployment, third party libraries get moved to /usr/local/lib where they belong, leaving the project clean enough to compile on our Linux deployment servers. This is used to test different library versions than the standard.
+- experiments: smaller classes or files to test technologies or ideas, and keep them around for future reference. They go here, where they do not dilute the real application�s files, but can still be found later.
+- src: The application and only the application�s source files.
+- test: All test code files. 
+
 # python extension
 
 python 3
@@ -55,5 +69,16 @@ Reference one of the following:
 
 ```
 
+
+## license dependencies
+
+MOTS2, on its own is licensed under the Apache model.
+
+In addition, the following packages were also used that follow individual licensing schemes.
+
+- easylogging++ , v9.96.4, https://github.com/muflihun/easyloggingpp, MIT license
+- catch2, v2.2.2, https://github.com/catchorg/Catch2, BSL-1 license
+
 # Future
 add CI/CD with Travis
+

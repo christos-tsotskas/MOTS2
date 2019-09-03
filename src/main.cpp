@@ -2,12 +2,13 @@
 // Name        : mots_3.cpp
 // Author      : Christos Tsotskas
 // Version     :
-// Copyright   : L-GPL
+// Copyright   : Apache 2
 // Description : MOTS in C++, Ansi-style
 //============================================================================
 
 
 //library that contains the tabu search function
+
 //#include <cstring>
 #include <sstream>
 #include <fstream>
@@ -22,9 +23,17 @@
 
 #include <vector>
 
+#include "easylogging++.h"
 
-int main(int argc, char *argv[]){
+INITIALIZE_EASYLOGGINGPP
+
+
+
+int main_example(int argc, char *argv[]){
 	std::cout << "MOTS2 main" << std::endl;
+
+	LOG(INFO) << "MOTS2 info log using default logger";
+
 
 	std::string external_name;
 	int flag=0;
